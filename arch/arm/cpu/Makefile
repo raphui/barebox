@@ -1,6 +1,7 @@
 obj-y += cpu.o
 obj-$(CONFIG_ARM_EXCEPTIONS) += exceptions.o
 obj-$(CONFIG_ARM_EXCEPTIONS) += interrupts.o
+#obj-$(CONFIG_ARM_V7M_EXCEPTIONS) += entry-v7m.o
 obj-y += start.o setupc.o entry.o
 
 #

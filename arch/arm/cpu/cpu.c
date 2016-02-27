@@ -105,9 +105,9 @@ static void arch_shutdown(void)
 	 * (eg. OMAP4_USBBOOT) require them enabled. So be sure interrupts are
 	 * disabled before exiting.
 	 */
-	__asm__ __volatile__("mrs %0, cpsr" : "=r"(r));
-	r |= PSR_I_BIT;
-	__asm__ __volatile__("msr cpsr, %0" : : "r"(r));
+//	__asm__ __volatile__("mrs %0, cpsr" : "=r"(r));
+//	r |= PSR_I_BIT;
+//	__asm__ __volatile__("msr cpsr, %0" : : "r"(r));
 }
 archshutdown_exitcall(arch_shutdown);
 
