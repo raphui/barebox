@@ -17,7 +17,9 @@ endif
 # at least some of the code would be executed with MMU off, lets be
 # conservative and instruct the compiler not to generate any unaligned
 # accesses
+ifneq ($(CONFIG_CPU_64v8),y)
 CFLAGS += -mno-unaligned-access
+endif
 
 
 # This selects which instruction set is used.
@@ -36,7 +38,7 @@ tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_XSCALE)	:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
 
 ifeq ($(CONFIG_AEABI),y)
-CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
+#CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
 else
 CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
 endif
@@ -52,8 +54,15 @@ CFLAGS_THUMB2	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
 AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
 endif
 
-CPPFLAGS += $(CFLAGS_ABI) $(arch-y) $(tune-y) -msoft-float $(CFLAGS_THUMB2)
-AFLAGS   += -include asm/unified.h -msoft-float $(AFLAGS_THUMB2)
+CPPFLAGS += $(CFLAGS_ABI) $(arch-y) $(tune-y) 
+ifneq ($(CONFIG_CPU_64v8),y)
+CPPFLAGS += -msoft-float $(CFLAGS_THUMB2)
+endif
+
+AFLAGS   += -include asm/unified.h
+ifneq ($(CONFIG_CPU_64v8),y)
+AFLAGS += -msoft-float $(AFLAGS_THUMB2)
+endif
 
 # Machine directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
