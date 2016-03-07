@@ -4,6 +4,8 @@
 #include <asm/gic.h>
 
 .section ".text_bare_init_","ax"
+
+#if __LINUX_ARM_ARCH__ <= 7
 ENTRY(arm_cpu_lowlevel_init)
 	/* set the cpu to SVC32 mode, mask irq and fiq */
 	mrs	r12, cpsr
@@ -57,8 +59,8 @@ ENTRY(arm_cpu_lowlevel_init)
 
 	mov	pc, lr
 ENDPROC(arm_cpu_lowlevel_init)
-
-ENTRY(armv8_cpu_lowlevel_init)
+#else
+ENTRY(arm_cpu_lowlevel_init)
 	adr	x0, vectors
 	mrs	x1, CurrentEL
 	cmp	x1, #0xC		/* Check EL3 state */
@@ -113,4 +115,5 @@ done:
 
 	ret
 
-ENDPROC(armv8_cpu_lowlevel_init)
+ENDPROC(arm_cpu_lowlevel_init)
+#endif /* __LINUX_ARM_ARCH__ */
