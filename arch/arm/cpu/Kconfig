@@ -4,6 +4,9 @@ config CPU_32
 	bool
 	default y
 
+config CPU_64
+	bool
+
 # Select CPU types depending on the architecture selected. This selects
 # which CPUs we support in the kernel image, and the compiler instruction
 # optimiser behaviour.
@@ -69,6 +72,11 @@ config CPU_V7
 	bool
 	select CPU_32v7
 
+# ARMv8
+config CPU_V8
+	bool
+	select CPU_64v8
+
 config CPU_XSC3
         bool
         select CPU_32v4T
@@ -92,6 +100,9 @@ config CPU_32v6
 	bool
 
 config CPU_32v7
+	bool
+
+config CPU_64v8
 	bool
 
 comment "processor features"
