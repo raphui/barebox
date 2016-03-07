@@ -1,6 +1,7 @@
 #include <linux/linkage.h>
 #include <init.h>
 #include <asm/system.h>
+#include <asm/gic.h>
 
 .section ".text_bare_init_","ax"
 ENTRY(arm_cpu_lowlevel_init)
@@ -88,8 +89,28 @@ ENTRY(armv8_cpu_lowlevel_init)
 	msr	cpacr_el1, x0
 	b	done
 
+done:
+	ldr	x1, =GIC_DIST_BASE		// GICD_CTLR
+	mov	w0, #3				// EnableGrp0 | EnableGrp1
+	str	w0, [x1]
 
-done:		
-	b	done
+	ldr	x1, =GIC_DIST_BASE + 0x80	// GICD_IGROUPR
+	mov	w0, #~0				// Grp1 interrupts
+	str	w0, [x1], #4
+	b.ne	2f				// Only local interrupts for secondary CPUs
+	str	w0, [x1], #4
+	str	w0, [x1], #4
+
+2:	ldr	x1, =GIC_CPU_BASE		// GICC_CTLR
+	ldr	w0, [x1]
+	mov	w0, #3				// EnableGrp0 | EnableGrp1
+	str	w0, [x1]
+
+	mov	w0, #1 << 7			// allow NS access to GICC_PMR
+	str	w0, [x1, #4]			// GICC_PMR
+
+	msr	sctlr_el2, xzr
+
+	ret
 
 ENDPROC(armv8_cpu_lowlevel_init)
