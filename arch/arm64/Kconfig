@@ -50,237 +50,21 @@ config BUILTIN_DTB_NAME
 choice
 	prompt "ARM system type"
 
-config ARCH_AT91
-	bool "Atmel AT91"
-	select GPIOLIB
-	select CLKDEV_LOOKUP
-	select HAS_DEBUG_LL
-	select HAVE_MACH_ARM_HEAD
-	select HAVE_CLK
-	select PINCTRL_AT91
-
-config ARCH_BCM2835
-	bool "Broadcom BCM2835 boards"
-	select ARCH_BCM283X
-	select CPU_ARM1176
-
-config ARCH_BCM2836
-	bool "Broadcom BCM2836 boards"
-	select ARCH_BCM283X
-	select CPU_V7
-
-config ARCH_CLPS711X
-	bool "Cirrus Logic EP711x/EP721x/EP731x"
-	select CLKDEV_LOOKUP
-	select CLOCKSOURCE_CLPS711X
-	select COMMON_CLK
-	select CPU_32v4T
-	select GPIOLIB
-	select MFD_SYSCON
-
-config ARCH_DAVINCI
-	bool "TI Davinci"
-	select CPU_ARM926T
-	select HAS_DEBUG_LL
-	select GPIOLIB
-
-config ARCH_DIGIC
-	bool "Canon DIGIC-based cameras"
-	select CPU_ARM946E
-	select HAS_DEBUG_LL
-	select CLOCKSOURCE_DIGIC
-	select GPIOLIB
-	help
-	  Support for Canon's digital cameras that use the DIGIC4 chip.
-
-config ARCH_EP93XX
-	bool "Cirrus Logic EP93xx"
-	select CPU_ARM920T
-	select GENERIC_GPIO
-
-config ARCH_HIGHBANK
-	bool "Calxeda Highbank"
-	select HAS_DEBUG_LL
-	select HAS_POWEROFF
-	select ARCH_HAS_L2X0
-	select CPU_V7
-	select ARM_AMBA
-	select AMBA_SP804
-	select CLKDEV_LOOKUP
-	select COMMON_CLK
-	select GPIOLIB
-
-config ARCH_IMX
-	bool "Freescale iMX-based"
-	select GPIOLIB
-	select COMMON_CLK
-	select CLKDEV_LOOKUP
-	select WATCHDOG_IMX_RESET_SOURCE
-	select HAS_DEBUG_LL
-
-config ARCH_MVEBU
-	bool "Marvell EBU platforms"
-	select COMMON_CLK
-	select COMMON_CLK_OF_PROVIDER
-	select CLKDEV_LOOKUP
-	select GPIOLIB
-	select HAS_DEBUG_LL
-	select HAVE_PBL_MULTI_IMAGES
-	select HW_HAS_PCI
-	select MVEBU_MBUS
-	select OFTREE
-	select OF_ADDRESS_PCI
-	select PINCTRL
-
-config ARCH_MXS
-	bool "Freescale i.MX23/28 (mxs) based"
-	select GPIOLIB
-	select GENERIC_GPIO
-	select COMMON_CLK
-	select CLKDEV_LOOKUP
-	select HAS_DEBUG_LL
-
-config ARCH_NETX
-	bool "Hilscher NetX based"
-	select CPU_ARM926T
-
-config ARCH_NOMADIK
-	bool "STMicroelectronics Nomadik"
-	select CPU_ARM926T
-	select CLOCKSOURCE_NOMADIK
-	select HAVE_CLK
-	help
-	  Support for the Nomadik platform by ST-Ericsson
-
-config ARCH_OMAP
-	bool "TI OMAP"
-	select HAS_DEBUG_LL
-	select GPIOLIB
-
-config ARCH_PXA
-	bool "Intel/Marvell PXA based"
-	select GENERIC_GPIO
-	select HAS_POWEROFF
-
-config ARCH_ROCKCHIP
-	bool "Rockchip RX3xxx"
-	select CPU_V7
-	select ARM_SMP_TWD
-	select COMMON_CLK
-	select CLKDEV_LOOKUP
-	select COMMON_CLK_OF_PROVIDER
-	select GPIOLIB
-	select PINCTRL
-	select PINCTRL_ROCKCHIP
-	select OFTREE
-	select HAVE_PBL_MULTI_IMAGES
-	select HAS_DEBUG_LL
-	select ARCH_HAS_L2X0
-
-config ARCH_SOCFPGA
-	bool "Altera SOCFPGA cyclone5"
-	select HAS_DEBUG_LL
-	select ARM_SMP_TWD
-	select CPU_V7
-	select COMMON_CLK
-	select CLKDEV_LOOKUP
-	select GPIOLIB
-	select HAVE_PBL_MULTI_IMAGES
-	select OFDEVICE if !ARCH_SOCFPGA_XLOAD
-	select OFTREE if !ARCH_SOCFPGA_XLOAD
-
-config ARCH_S3C24xx
-	bool "Samsung S3C2410, S3C2440"
-	select ARCH_SAMSUNG
-	select CPU_ARM920T
-	select GENERIC_GPIO
-
-config ARCH_S5PCxx
-	bool "Samsung S5PC110, S5PV210"
-	select ARCH_SAMSUNG
-	select CPU_V7
-	select GENERIC_GPIO
-
-config ARCH_S3C64xx
-	bool "Samsung S3C64xx"
-	select ARCH_SAMSUNG
-	select CPU_V6
-	select GENERIC_GPIO
-
-config ARCH_VERSATILE
-	bool "ARM Versatile boards (ARM926EJ-S)"
-	select GPIOLIB
-	select HAVE_CLK
-	select HAS_DEBUG_LL
-
 config ARCH_VEXPRESS
 	bool "ARM Vexpres boards"
 	select HAS_DEBUG_LL
 #	select CPU_V7
 	select CPU_V8
+	select SYS_SUPPORTS_64BIT_KERNEL
 	select ARM_AMBA
 	select AMBA_SP804
 	select CLKDEV_LOOKUP
 	select COMMON_CLK
 
-config ARCH_TEGRA
-	bool "NVIDIA Tegra"
-	select CPU_V7
-	select HAS_DEBUG_LL
-	select HW_HAS_PCI
-	select COMMON_CLK
-	select COMMON_CLK_OF_PROVIDER
-	select CLKDEV_LOOKUP
-	select GPIOLIB
-	select GPIO_TEGRA
-	select HAVE_DEFAULT_ENVIRONMENT_NEW
-	select HAVE_PBL_MULTI_IMAGES
-	select OFDEVICE
-	select OFTREE
-	select RELOCATABLE
-	select RESET_CONTROLLER
-	select PINCTRL
-
-config ARCH_UEMD
-	bool "RC Module UEMD Platform"
-	select CPU_ARM1176
-	select COMMON_CLK
-	select COMMON_CLK_OF_PROVIDER
-	select CLKDEV_LOOKUP
-	select OFDEVICE
-	select OFTREE
-	select CLOCKSOURCE_UEMD
-	select HAS_DEBUG_LL
-
-config ARCH_ZYNQ
-	bool "Xilinx Zynq-based boards"
-	select HAS_DEBUG_LL
-
 endchoice
 
-source arch/arm/cpu/Kconfig
-source arch/arm/mach-at91/Kconfig
-source arch/arm/mach-bcm283x/Kconfig
-source arch/arm/mach-clps711x/Kconfig
-source arch/arm/mach-davinci/Kconfig
-source arch/arm/mach-digic/Kconfig
-source arch/arm/mach-ep93xx/Kconfig
-source arch/arm/mach-highbank/Kconfig
-source arch/arm/mach-imx/Kconfig
-source arch/arm/mach-mxs/Kconfig
-source arch/arm/mach-mvebu/Kconfig
-source arch/arm/mach-netx/Kconfig
-source arch/arm/mach-nomadik/Kconfig
-source arch/arm/mach-omap/Kconfig
-source arch/arm/mach-pxa/Kconfig
-source arch/arm/mach-rockchip/Kconfig
-source arch/arm/mach-samsung/Kconfig
-source arch/arm/mach-socfpga/Kconfig
-source arch/arm/mach-versatile/Kconfig
-source arch/arm/mach-vexpress/Kconfig
-source arch/arm/mach-tegra/Kconfig
-source arch/arm/mach-uemd/Kconfig
-source arch/arm/mach-zynq/Kconfig
+source arch/arm64/cpu/Kconfig
+source arch/arm64/mach-vexpress/Kconfig
 
 config ARM_ASM_UNIFIED
 	bool
@@ -315,6 +99,29 @@ config ARM_BOARD_APPEND_ATAG
 	  ** DO NOT USE FOR YOUR OWN DESIGNS! **
 
 endmenu
+
+choice
+	prompt "Barebox code model"
+	help
+	  You should only select this option if you have a workload that
+	  actually benefits from 64-bit processing or if your machine has
+	  large memory. You will only be presented a single option in this
+	  menu if your system does not support both 32-bit and 64-bit modes.
+
+config 32BIT
+	bool "32-bit barebox"
+	depends on CPU_SUPPORTS_32BIT_KERNEL && SYS_SUPPORTS_32BIT_KERNEL
+	help
+	  Select this option if you want to build a 32-bit barebox.
+
+config 64BIT
+	bool "64-bit barebox"
+	depends on CPU_SUPPORTS_64BIT_KERNEL && SYS_SUPPORTS_64BIT_KERNEL
+	select ARCH_DMA_ADDR_T_64BIT
+	help
+	  Select this option if you want to build a 64-bit barebox.
+
+endchoice
 
 menu "ARM specific settings"
 
