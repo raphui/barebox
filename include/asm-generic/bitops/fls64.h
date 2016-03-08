@@ -2,6 +2,7 @@
 #define _ASM_GENERIC_BITOPS_FLS64_H_
 
 #include <asm/types.h>
+#include <asm-generic/bitops/__fls.h>
 
 /**
  * fls64 - find last set bit in a 64-bit word
