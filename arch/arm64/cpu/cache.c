@@ -32,10 +32,7 @@ struct cache_fns *cache_fns;
 		.mmu_cache_flush = arch##_mmu_cache_flush,			\
 	};
 
-DEFINE_CPU_FNS(v4)
-DEFINE_CPU_FNS(v5)
-DEFINE_CPU_FNS(v6)
-DEFINE_CPU_FNS(v7)
+DEFINE_CPU_FNS(v8)
 
 void __dma_clean_range(unsigned long start, unsigned long end)
 {
@@ -78,27 +75,9 @@ void __mmu_cache_flush(void)
 int arm_set_cache_functions(void)
 {
 	switch (cpu_architecture()) {
-#ifdef CONFIG_CPU_32v4T
-	case CPU_ARCH_ARMv4T:
-		cache_fns = &cache_fns_armv4;
-		break;
-#endif
-#ifdef CONFIG_CPU_32v5
-	case CPU_ARCH_ARMv5:
-	case CPU_ARCH_ARMv5T:
-	case CPU_ARCH_ARMv5TE:
-	case CPU_ARCH_ARMv5TEJ:
-		cache_fns = &cache_fns_armv5;
-		break;
-#endif
-#ifdef CONFIG_CPU_32v6
-	case CPU_ARCH_ARMv6:
-		cache_fns = &cache_fns_armv6;
-		break;
-#endif
-#ifdef CONFIG_CPU_32v7
-	case CPU_ARCH_ARMv7:
-		cache_fns = &cache_fns_armv7;
+#ifdef CONFIG_CPU_64v8
+	case CPU_ARCH_ARMv8:
+		cache_fns = &cache_fns_armv8;
 		break;
 #endif
 	default:
@@ -115,48 +94,22 @@ int arm_set_cache_functions(void)
 void arm_early_mmu_cache_flush(void)
 {
 	switch (arm_early_get_cpu_architecture()) {
-#ifdef CONFIG_CPU_32v4T
-	case CPU_ARCH_ARMv4T:
-		v4_mmu_cache_flush();
-		return;
-#endif
-#ifdef CONFIG_CPU_32v5
-	case CPU_ARCH_ARMv5:
-	case CPU_ARCH_ARMv5T:
-	case CPU_ARCH_ARMv5TE:
-	case CPU_ARCH_ARMv5TEJ:
-		v5_mmu_cache_flush();
-		return;
-#endif
-#ifdef CONFIG_CPU_32v6
-	case CPU_ARCH_ARMv6:
-		v6_mmu_cache_flush();
-		return;
-#endif
-#ifdef CONFIG_CPU_32v7
-	case CPU_ARCH_ARMv7:
-		v7_mmu_cache_flush();
+#ifdef CONFIG_CPU_64v8
+	case CPU_ARCH_ARMv8:
+//		v7_mmu_cache_flush();
 		return;
 #endif
 	}
 }
 
-void v7_mmu_cache_invalidate(void);
+//void v7_mmu_cache_invalidate(void);
 
 void arm_early_mmu_cache_invalidate(void)
 {
 	switch (arm_early_get_cpu_architecture()) {
-	case CPU_ARCH_ARMv4T:
-	case CPU_ARCH_ARMv5:
-	case CPU_ARCH_ARMv5T:
-	case CPU_ARCH_ARMv5TE:
-	case CPU_ARCH_ARMv5TEJ:
-	case CPU_ARCH_ARMv6:
-		asm volatile("mcr p15, 0, %0, c7, c6, 0\n" : : "r"(0));
-		return;
-#ifdef CONFIG_CPU_32v7
-	case CPU_ARCH_ARMv7:
-		v7_mmu_cache_invalidate();
+#ifdef CONFIG_CPU_64v8
+	case CPU_ARCH_ARMv8:
+//		v7_mmu_cache_invalidate();
 		return;
 #endif
 	}

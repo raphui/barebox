@@ -40,11 +40,8 @@
  */
 void icache_enable(void)
 {
-	u32 r;
-
-	r = get_cr();
-	r |= CR_I;
-	set_cr(r);
+	v8_invalidate_icache_all();
+	set_sctlr(get_sctlr() | CR_I);
 }
 
 /**
@@ -52,11 +49,7 @@ void icache_enable(void)
  */
 void icache_disable(void)
 {
-	u32 r;
-
-	r = get_cr();
-	r &= ~CR_I;
-	set_cr(r);
+	set_sctlr(get_sctlr() & ~CR_I);
 }
 
 /**
@@ -65,7 +58,7 @@ void icache_disable(void)
  */
 int icache_status(void)
 {
-	return (get_cr () & CR_I) != 0;
+	return (get_sctlr() & CR_I) != 0;
 }
 
 /*
@@ -105,9 +98,9 @@ static void arch_shutdown(void)
 	 * (eg. OMAP4_USBBOOT) require them enabled. So be sure interrupts are
 	 * disabled before exiting.
 	 */
-	__asm__ __volatile__("mrs %0, cpsr" : "=r"(r));
+//	__asm__ __volatile__("mrs %0, cpsr" : "=r"(r));
 	r |= PSR_I_BIT;
-	__asm__ __volatile__("msr cpsr, %0" : : "r"(r));
+//	__asm__ __volatile__("msr cpsr, %0" : : "r"(r));
 }
 archshutdown_exitcall(arch_shutdown);
 

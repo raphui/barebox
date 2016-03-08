@@ -32,29 +32,57 @@
 
 #define __exceptions_size (__exceptions_stop - __exceptions_start)
 
-static int nommu_v7_vectors_init(void)
+//static int nommu_v7_vectors_init(void)
+//{
+//	void *vectors;
+//	u32 cr;
+//
+//	if (cpu_architecture() < CPU_ARCH_ARMv7)
+//		return 0;
+//
+//	/*
+//	 * High vectors cannot be re-mapped, so we have to use normal
+//	 * vectors
+//	 */
+//	cr = get_cr();
+//	cr &= ~CR_V;
+//	set_cr(cr);
+//
+//	arm_fixup_vectors();
+//
+//	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
+//	memset(vectors, 0, PAGE_SIZE);
+//	memcpy(vectors, __exceptions_start, __exceptions_size);
+//
+//	set_vbar((unsigned int)vectors);
+//
+//	return 0;
+//}
+//mmu_initcall(nommu_v7_vectors_init);
+
+static int nommu_v8_vectors_init(void)
 {
 	void *vectors;
 	u32 cr;
 
-	if (cpu_architecture() < CPU_ARCH_ARMv7)
+	if (cpu_architecture() < CPU_ARCH_ARMv8)
 		return 0;
 
-	/*
-	 * High vectors cannot be re-mapped, so we have to use normal
-	 * vectors
-	 */
-	cr = get_cr();
-	cr &= ~CR_V;
-	set_cr(cr);
-
-	arm_fixup_vectors();
-
-	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
-	memset(vectors, 0, PAGE_SIZE);
-	memcpy(vectors, __exceptions_start, __exceptions_size);
-
-	set_vbar((unsigned int)vectors);
+//	/*
+//	 * High vectors cannot be re-mapped, so we have to use normal
+//	 * vectors
+//	 */
+//	cr = get_cr();
+//	cr &= ~CR_V;
+//	set_cr(cr);
+//
+//	arm_fixup_vectors();
+//
+//	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
+//	memset(vectors, 0, PAGE_SIZE);
+//	memcpy(vectors, __exceptions_start, __exceptions_size);
+//
+//	set_vbar((unsigned int)vectors);
 
 	return 0;
 }
