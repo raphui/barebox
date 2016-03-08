@@ -86,4 +86,4 @@ static int nommu_v8_vectors_init(void)
 
 	return 0;
 }
-mmu_initcall(nommu_v7_vectors_init);
+mmu_initcall(nommu_v8_vectors_init);
