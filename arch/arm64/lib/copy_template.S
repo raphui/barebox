@@ -1,268 +1,192 @@
 /*
- *  linux/arch/arm/lib/copy_template.s
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2013 Linaro.
  *
- *  Code template for optimized memory copy functions
+ * This code is based on glibc cortex strings work originally authored by Linaro
+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
+ * be found @
  *
- *  Author:	Nicolas Pitre
- *  Created:	Sep 28, 2005
- *  Copyright:	MontaVista Software, Inc.
+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+ * files/head:/src/aarch64/
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-/*
- * Theory of operation
- * -------------------
- *
- * This file provides the core code for a forward memory copy used in
- * the implementation of memcopy(), copy_to_user() and copy_from_user().
- *
- * The including file must define the following accessor macros
- * according to the need of the given function:
- *
- * ldr1w ptr reg abort
- *
- *	This loads one word from 'ptr', stores it in 'reg' and increments
- *	'ptr' to the next word. The 'abort' argument is used for fixup tables.
- *
- * ldr4w ptr reg1 reg2 reg3 reg4 abort
- * ldr8w ptr, reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
- *
- *	This loads four or eight words starting from 'ptr', stores them
- *	in provided registers and increments 'ptr' past those words.
- *	The'abort' argument is used for fixup tables.
- *
- * ldr1b ptr reg cond abort
- *
- *	Similar to ldr1w, but it loads a byte and increments 'ptr' one byte.
- *	It also must apply the condition code if provided, otherwise the
- *	"al" condition is assumed by default.
- *
- * str1w ptr reg abort
- * str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
- * str1b ptr reg cond abort
- *
- *	Same as their ldr* counterparts, but data is stored to 'ptr' location
- *	rather than being loaded.
- *
- * enter reg1 reg2
- *
- *	Preserve the provided registers on the stack plus any additional
- *	data as needed by the implementation including this code. Called
- *	upon code entry.
- *
- * exit reg1 reg2
- *
- *	Restore registers with the values previously saved with the
- *	'preserv' macro. Called upon code termination.
- *
- * LDR1W_SHIFT
- * STR1W_SHIFT
- *
- *	Correction to be applied to the "ip" register when branching into
- *	the ldr1w or str1w instructions (some of these macros may expand to
- *	than one 32bit instruction in Thumb-2)
- */
-
-
-		enter	r4, lr
-
-		subs	r2, r2, #4
-		blt	8f
-		ands	ip, r0, #3
-	PLD(	pld	[r1, #0]		)
-		bne	9f
-		ands	ip, r1, #3
-		bne	10f
-
-1:		subs	r2, r2, #(28)
-		stmfd	sp!, {r5 - r8}
-		blt	5f
-
-	CALGN(	ands	ip, r0, #31		)
-	CALGN(	rsb	r3, ip, #32		)
-	CALGN(	sbcnes	r4, r3, r2		)  @ C is always set here
-	CALGN(	bcs	2f			)
-	CALGN(	adr	r4, 6f			)
-	CALGN(	subs	r2, r2, r3		)  @ C gets set
-	CALGN(	add	pc, r4, ip		)
-
-	PLD(	pld	[r1, #0]		)
-2:	PLD(	subs	r2, r2, #96		)
-	PLD(	pld	[r1, #28]		)
-	PLD(	blt	4f			)
-	PLD(	pld	[r1, #60]		)
-	PLD(	pld	[r1, #92]		)
-
-3:	PLD(	pld	[r1, #124]		)
-4:		ldr8w	r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-		subs	r2, r2, #32
-		str8w	r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-		bge	3b
-	PLD(	cmn	r2, #96			)
-	PLD(	bge	4b			)
-
-5:		ands	ip, r2, #28
-		rsb	ip, ip, #32
-#if LDR1W_SHIFT > 0
-		lsl	ip, ip, #LDR1W_SHIFT
-#endif
-		addne	pc, pc, ip		@ C is always clear here
-		b	7f
-6:
-		.rept	(1 << LDR1W_SHIFT)
-		W(nop)
-		.endr
-		ldr1w	r1, r3, abort=20f
-		ldr1w	r1, r4, abort=20f
-		ldr1w	r1, r5, abort=20f
-		ldr1w	r1, r6, abort=20f
-		ldr1w	r1, r7, abort=20f
-		ldr1w	r1, r8, abort=20f
-		ldr1w	r1, lr, abort=20f
-
-#if LDR1W_SHIFT < STR1W_SHIFT
-		lsl	ip, ip, #STR1W_SHIFT - LDR1W_SHIFT
-#elif LDR1W_SHIFT > STR1W_SHIFT
-		lsr	ip, ip, #LDR1W_SHIFT - STR1W_SHIFT
-#endif
-		add	pc, pc, ip
-		nop
-		.rept	(1 << STR1W_SHIFT)
-		W(nop)
-		.endr
-		str1w	r0, r3, abort=20f
-		str1w	r0, r4, abort=20f
-		str1w	r0, r5, abort=20f
-		str1w	r0, r6, abort=20f
-		str1w	r0, r7, abort=20f
-		str1w	r0, r8, abort=20f
-		str1w	r0, lr, abort=20f
-
-	CALGN(	bcs	2b			)
-
-7:		ldmfd	sp!, {r5 - r8}
-
-8:		movs	r2, r2, lsl #31
-		ldr1b	r1, r3, ne, abort=21f
-		ldr1b	r1, r4, cs, abort=21f
-		ldr1b	r1, ip, cs, abort=21f
-		str1b	r0, r3, ne, abort=21f
-		str1b	r0, r4, cs, abort=21f
-		str1b	r0, ip, cs, abort=21f
-
-		exit	r4, pc
-
-9:		rsb	ip, ip, #4
-		cmp	ip, #2
-		ldr1b	r1, r3, gt, abort=21f
-		ldr1b	r1, r4, ge, abort=21f
-		ldr1b	r1, lr, abort=21f
-		str1b	r0, r3, gt, abort=21f
-		str1b	r0, r4, ge, abort=21f
-		subs	r2, r2, ip
-		str1b	r0, lr, abort=21f
-		blt	8b
-		ands	ip, r1, #3
-		beq	1b
-
-10:		bic	r1, r1, #3
-		cmp	ip, #2
-		ldr1w	r1, lr, abort=21f
-		beq	17f
-		bgt	18f
-
-
-		.macro	forward_copy_shift pull push
-
-		subs	r2, r2, #28
-		blt	14f
-
-	CALGN(	ands	ip, r0, #31		)
-	CALGN(	rsb	ip, ip, #32		)
-	CALGN(	sbcnes	r4, ip, r2		)  @ C is always set here
-	CALGN(	subcc	r2, r2, ip		)
-	CALGN(	bcc	15f			)
-
-11:		stmfd	sp!, {r5 - r9}
-
-	PLD(	pld	[r1, #0]		)
-	PLD(	subs	r2, r2, #96		)
-	PLD(	pld	[r1, #28]		)
-	PLD(	blt	13f			)
-	PLD(	pld	[r1, #60]		)
-	PLD(	pld	[r1, #92]		)
-
-12:	PLD(	pld	[r1, #124]		)
-13:		ldr4w	r1, r4, r5, r6, r7, abort=19f
-		mov	r3, lr, pull #\pull
-		subs	r2, r2, #32
-		ldr4w	r1, r8, r9, ip, lr, abort=19f
-		orr	r3, r3, r4, push #\push
-		mov	r4, r4, pull #\pull
-		orr	r4, r4, r5, push #\push
-		mov	r5, r5, pull #\pull
-		orr	r5, r5, r6, push #\push
-		mov	r6, r6, pull #\pull
-		orr	r6, r6, r7, push #\push
-		mov	r7, r7, pull #\pull
-		orr	r7, r7, r8, push #\push
-		mov	r8, r8, pull #\pull
-		orr	r8, r8, r9, push #\push
-		mov	r9, r9, pull #\pull
-		orr	r9, r9, ip, push #\push
-		mov	ip, ip, pull #\pull
-		orr	ip, ip, lr, push #\push
-		str8w	r0, r3, r4, r5, r6, r7, r8, r9, ip, , abort=19f
-		bge	12b
-	PLD(	cmn	r2, #96			)
-	PLD(	bge	13b			)
-
-		ldmfd	sp!, {r5 - r9}
-
-14:		ands	ip, r2, #28
-		beq	16f
-
-15:		mov	r3, lr, pull #\pull
-		ldr1w	r1, lr, abort=21f
-		subs	ip, ip, #4
-		orr	r3, r3, lr, push #\push
-		str1w	r0, r3, abort=21f
-		bgt	15b
-	CALGN(	cmp	r2, #0			)
-	CALGN(	bge	11b			)
-
-16:		sub	r1, r1, #(\push / 8)
-		b	8b
-
-		.endm
-
-
-		forward_copy_shift	pull=8	push=24
-
-17:		forward_copy_shift	pull=16	push=16
-
-18:		forward_copy_shift	pull=24	push=8
 
 
 /*
- * Abort preamble and completion macros.
- * If a fixup handler is required then those macros must surround it.
- * It is assumed that the fixup code will handle the private part of
- * the exit macro.
+ * Copy a buffer from src to dest (alignment handled by the hardware)
+ *
+ * Parameters:
+ *	x0 - dest
+ *	x1 - src
+ *	x2 - n
+ * Returns:
+ *	x0 - dest
  */
+dstin	.req	x0
+src	.req	x1
+count	.req	x2
+tmp1	.req	x3
+tmp1w	.req	w3
+tmp2	.req	x4
+tmp2w	.req	w4
+dst	.req	x6
 
-	.macro	copy_abort_preamble
-19:	ldmfd	sp!, {r5 - r9}
-	b	21f
-20:	ldmfd	sp!, {r5 - r8}
-21:
-	.endm
+A_l	.req	x7
+A_h	.req	x8
+B_l	.req	x9
+B_h	.req	x10
+C_l	.req	x11
+C_h	.req	x12
+D_l	.req	x13
+D_h	.req	x14
 
-	.macro	copy_abort_end
-	ldmfd	sp!, {r4, pc}
-	.endm
+	mov	dst, dstin
+	cmp	count, #16
+	/*When memory length is less than 16, the accessed are not aligned.*/
+	b.lo	.Ltiny15
 
+	neg	tmp2, src
+	ands	tmp2, tmp2, #15/* Bytes to reach alignment. */
+	b.eq	.LSrcAligned
+	sub	count, count, tmp2
+	/*
+	* Copy the leading memory data from src to dst in an increasing
+	* address order.By this way,the risk of overwritting the source
+	* memory data is eliminated when the distance between src and
+	* dst is less than 16. The memory accesses here are alignment.
+	*/
+	tbz	tmp2, #0, 1f
+	ldrb1	tmp1w, src, #1
+	strb1	tmp1w, dst, #1
+1:
+	tbz	tmp2, #1, 2f
+	ldrh1	tmp1w, src, #2
+	strh1	tmp1w, dst, #2
+2:
+	tbz	tmp2, #2, 3f
+	ldr1	tmp1w, src, #4
+	str1	tmp1w, dst, #4
+3:
+	tbz	tmp2, #3, .LSrcAligned
+	ldr1	tmp1, src, #8
+	str1	tmp1, dst, #8
 
+.LSrcAligned:
+	cmp	count, #64
+	b.ge	.Lcpy_over64
+	/*
+	* Deal with small copies quickly by dropping straight into the
+	* exit block.
+	*/
+.Ltail63:
+	/*
+	* Copy up to 48 bytes of data. At this point we only need the
+	* bottom 6 bits of count to be accurate.
+	*/
+	ands	tmp1, count, #0x30
+	b.eq	.Ltiny15
+	cmp	tmp1w, #0x20
+	b.eq	1f
+	b.lt	2f
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+1:
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+2:
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+.Ltiny15:
+	/*
+	* Prefer to break one ldp/stp into several load/store to access
+	* memory in an increasing address order,rather than to load/store 16
+	* bytes from (src-16) to (dst-16) and to backward the src to aligned
+	* address,which way is used in original cortex memcpy. If keeping
+	* the original memcpy process here, memmove need to satisfy the
+	* precondition that src address is at least 16 bytes bigger than dst
+	* address,otherwise some source data will be overwritten when memove
+	* call memcpy directly. To make memmove simpler and decouple the
+	* memcpy's dependency on memmove, withdrew the original process.
+	*/
+	tbz	count, #3, 1f
+	ldr1	tmp1, src, #8
+	str1	tmp1, dst, #8
+1:
+	tbz	count, #2, 2f
+	ldr1	tmp1w, src, #4
+	str1	tmp1w, dst, #4
+2:
+	tbz	count, #1, 3f
+	ldrh1	tmp1w, src, #2
+	strh1	tmp1w, dst, #2
+3:
+	tbz	count, #0, .Lexitfunc
+	ldrb1	tmp1w, src, #1
+	strb1	tmp1w, dst, #1
+
+	b	.Lexitfunc
+
+.Lcpy_over64:
+	subs	count, count, #128
+	b.ge	.Lcpy_body_large
+	/*
+	* Less than 128 bytes to copy, so handle 64 here and then jump
+	* to the tail.
+	*/
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+	ldp1	B_l, B_h, src, #16
+	ldp1	C_l, C_h, src, #16
+	stp1	B_l, B_h, dst, #16
+	stp1	C_l, C_h, dst, #16
+	ldp1	D_l, D_h, src, #16
+	stp1	D_l, D_h, dst, #16
+
+	tst	count, #0x3f
+	b.ne	.Ltail63
+	b	.Lexitfunc
+
+	/*
+	* Critical loop.  Start at a new cache line boundary.  Assuming
+	* 64 bytes per line this ensures the entire loop is in one line.
+	*/
+.Lcpy_body_large:
+	/* pre-get 64 bytes data. */
+	ldp1	A_l, A_h, src, #16
+	ldp1	B_l, B_h, src, #16
+	ldp1	C_l, C_h, src, #16
+	ldp1	D_l, D_h, src, #16
+1:
+	/*
+	* interlace the load of next 64 bytes data block with store of the last
+	* loaded 64 bytes data.
+	*/
+	stp1	A_l, A_h, dst, #16
+	ldp1	A_l, A_h, src, #16
+	stp1	B_l, B_h, dst, #16
+	ldp1	B_l, B_h, src, #16
+	stp1	C_l, C_h, dst, #16
+	ldp1	C_l, C_h, src, #16
+	stp1	D_l, D_h, dst, #16
+	ldp1	D_l, D_h, src, #16
+	subs	count, count, #64
+	b.ge	1b
+	stp1	A_l, A_h, dst, #16
+	stp1	B_l, B_h, dst, #16
+	stp1	C_l, C_h, dst, #16
+	stp1	D_l, D_h, dst, #16
+
+	tst	count, #0x3f
+	b.ne	.Ltail63
+.Lexitfunc:

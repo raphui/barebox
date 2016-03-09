@@ -1,124 +1,215 @@
 /*
- *  linux/arch/arm/lib/memset.S
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2013 Linaro.
  *
- *  Copyright (C) 1995-2000 Russell King
+ * This code is based on glibc cortex strings work originally authored by Linaro
+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
+ * be found @
+ *
+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+ * files/head:/src/aarch64/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- *  ASM optimised string functions
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-	.text
-	.align	5
+/*
+ * Fill in the buffer with character c (alignment handled by the hardware)
+ *
+ * Parameters:
+ *	x0 - buf
+ *	x1 - c
+ *	x2 - n
+ * Returns:
+ *	x0 - buf
+ */
 
+dstin		.req	x0
+val		.req	w1
+count		.req	x2
+tmp1		.req	x3
+tmp1w		.req	w3
+tmp2		.req	x4
+tmp2w		.req	w4
+zva_len_x	.req	x5
+zva_len		.req	w5
+zva_bits_x	.req	x6
+
+A_l		.req	x7
+A_lw		.req	w7
+dst		.req	x8
+tmp3w		.req	w9
+tmp3		.req	x9
+
+	.weak memset
 ENTRY(memset)
-	ands	r3, r0, #3		@ 1 unaligned?
-	mov	ip, r0			@ preserve r0 as return value
-	bne	6f			@ 1
+	mov	dst, dstin	/* Preserve return value.  */
+	and	A_lw, val, #255
+	orr	A_lw, A_lw, A_lw, lsl #8
+	orr	A_lw, A_lw, A_lw, lsl #16
+	orr	A_l, A_l, A_l, lsl #32
+
+	cmp	count, #15
+	b.hi	.Lover16_proc
+	/*All store maybe are non-aligned..*/
+	tbz	count, #3, 1f
+	str	A_l, [dst], #8
+1:
+	tbz	count, #2, 2f
+	str	A_lw, [dst], #4
+2:
+	tbz	count, #1, 3f
+	strh	A_lw, [dst], #2
+3:
+	tbz	count, #0, 4f
+	strb	A_lw, [dst]
+4:
+	ret
+
+.Lover16_proc:
+	/*Whether  the start address is aligned with 16.*/
+	neg	tmp2, dst
+	ands	tmp2, tmp2, #15
+	b.eq	.Laligned
 /*
- * we know that the pointer in ip is aligned to a word boundary.
- */
-1:	orr	r1, r1, r1, lsl #8
-	orr	r1, r1, r1, lsl #16
-	mov	r3, r1
-	cmp	r2, #16
-	blt	4f
+* The count is not less than 16, we can use stp to store the start 16 bytes,
+* then adjust the dst aligned with 16.This process will make the current
+* memory address at alignment boundary.
+*/
+	stp	A_l, A_l, [dst] /*non-aligned store..*/
+	/*make the dst aligned..*/
+	sub	count, count, tmp2
+	add	dst, dst, tmp2
 
-#if ! CALGN(1)+0
+.Laligned:
+	cbz	A_l, .Lzero_mem
 
+.Ltail_maybe_long:
+	cmp	count, #64
+	b.ge	.Lnot_short
+.Ltail63:
+	ands	tmp1, count, #0x30
+	b.eq	3f
+	cmp	tmp1w, #0x20
+	b.eq	1f
+	b.lt	2f
+	stp	A_l, A_l, [dst], #16
+1:
+	stp	A_l, A_l, [dst], #16
+2:
+	stp	A_l, A_l, [dst], #16
 /*
- * We need an 2 extra registers for this loop - use r8 and the LR
- */
-	stmfd	sp!, {r8, lr}
-	mov	r8, r1
-	mov	lr, r1
+* The last store length is less than 16,use stp to write last 16 bytes.
+* It will lead some bytes written twice and the access is non-aligned.
+*/
+3:
+	ands	count, count, #15
+	cbz	count, 4f
+	add	dst, dst, count
+	stp	A_l, A_l, [dst, #-16]	/* Repeat some/all of last store. */
+4:
+	ret
 
-2:	subs	r2, r2, #64
-	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
-	stmgeia	ip!, {r1, r3, r8, lr}
-	stmgeia	ip!, {r1, r3, r8, lr}
-	stmgeia	ip!, {r1, r3, r8, lr}
-	bgt	2b
-	ldmeqfd	sp!, {r8, pc}		@ Now <64 bytes to go.
-/*
- * No need to correct the count; we're only testing bits from now on
- */
-	tst	r2, #32
-	stmneia	ip!, {r1, r3, r8, lr}
-	stmneia	ip!, {r1, r3, r8, lr}
-	tst	r2, #16
-	stmneia	ip!, {r1, r3, r8, lr}
-	ldmfd	sp!, {r8, lr}
+	/*
+	* Critical loop. Start at a new cache line boundary. Assuming
+	* 64 bytes per line, this ensures the entire loop is in one line.
+	*/
+.Lnot_short:
+	sub	dst, dst, #16/* Pre-bias.  */
+	sub	count, count, #64
+1:
+	stp	A_l, A_l, [dst, #16]
+	stp	A_l, A_l, [dst, #32]
+	stp	A_l, A_l, [dst, #48]
+	stp	A_l, A_l, [dst, #64]!
+	subs	count, count, #64
+	b.ge	1b
+	tst	count, #0x3f
+	add	dst, dst, #16
+	b.ne	.Ltail63
+.Lexitfunc:
+	ret
 
-#else
+	/*
+	* For zeroing memory, check to see if we can use the ZVA feature to
+	* zero entire 'cache' lines.
+	*/
+.Lzero_mem:
+	cmp	count, #63
+	b.le	.Ltail63
+	/*
+	* For zeroing small amounts of memory, it's not worth setting up
+	* the line-clear code.
+	*/
+	cmp	count, #128
+	b.lt	.Lnot_short /*count is at least  128 bytes*/
 
-/*
- * This version aligns the destination pointer in order to write
- * whole cache lines at once.
- */
+	mrs	tmp1, dczid_el0
+	tbnz	tmp1, #4, .Lnot_short
+	mov	tmp3w, #4
+	and	zva_len, tmp1w, #15	/* Safety: other bits reserved.  */
+	lsl	zva_len, tmp3w, zva_len
 
-	stmfd	sp!, {r4-r8, lr}
-	mov	r4, r1
-	mov	r5, r1
-	mov	r6, r1
-	mov	r7, r1
-	mov	r8, r1
-	mov	lr, r1
-
-	cmp	r2, #96
-	tstgt	ip, #31
-	ble	3f
-
-	and	r8, ip, #31
-	rsb	r8, r8, #32
-	sub	r2, r2, r8
-	movs	r8, r8, lsl #(32 - 4)
-	stmcsia	ip!, {r4, r5, r6, r7}
-	stmmiia	ip!, {r4, r5}
-	tst	r8, #(1 << 30)
-	mov	r8, r1
-	strne	r1, [ip], #4
-
-3:	subs	r2, r2, #64
-	stmgeia	ip!, {r1, r3-r8, lr}
-	stmgeia	ip!, {r1, r3-r8, lr}
-	bgt	3b
-	ldmeqfd	sp!, {r4-r8, pc}
-
-	tst	r2, #32
-	stmneia	ip!, {r1, r3-r8, lr}
-	tst	r2, #16
-	stmneia	ip!, {r4-r7}
-	ldmfd	sp!, {r4-r8, lr}
-
-#endif
-
-4:	tst	r2, #8
-	stmneia	ip!, {r1, r3}
-	tst	r2, #4
-	strne	r1, [ip], #4
-/*
- * When we get here, we've got less than 4 bytes to zero.  We
- * may have an unaligned pointer as well.
- */
-5:	tst	r2, #2
-	strneb	r1, [ip], #1
-	strneb	r1, [ip], #1
-	tst	r2, #1
-	strneb	r1, [ip], #1
-	mov	pc, lr
-
-6:	subs	r2, r2, #4		@ 1 do we have enough
-	blt	5b			@ 1 bytes to align with?
-	cmp	r3, #2			@ 1
-	strltb	r1, [ip], #1		@ 1
-	strleb	r1, [ip], #1		@ 1
-	strb	r1, [ip], #1		@ 1
-	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
-	b	1b
+	ands	tmp3w, zva_len, #63
+	/*
+	* ensure the zva_len is not less than 64.
+	* It is not meaningful to use ZVA if the block size is less than 64.
+	*/
+	b.ne	.Lnot_short
+.Lzero_by_line:
+	/*
+	* Compute how far we need to go to become suitably aligned. We're
+	* already at quad-word alignment.
+	*/
+	cmp	count, zva_len_x
+	b.lt	.Lnot_short		/* Not enough to reach alignment.  */
+	sub	zva_bits_x, zva_len_x, #1
+	neg	tmp2, dst
+	ands	tmp2, tmp2, zva_bits_x
+	b.eq	2f			/* Already aligned.  */
+	/* Not aligned, check that there's enough to copy after alignment.*/
+	sub	tmp1, count, tmp2
+	/*
+	* grantee the remain length to be ZVA is bigger than 64,
+	* avoid to make the 2f's process over mem range.*/
+	cmp	tmp1, #64
+	ccmp	tmp1, zva_len_x, #8, ge	/* NZCV=0b1000 */
+	b.lt	.Lnot_short
+	/*
+	* We know that there's at least 64 bytes to zero and that it's safe
+	* to overrun by 64 bytes.
+	*/
+	mov	count, tmp1
+1:
+	stp	A_l, A_l, [dst]
+	stp	A_l, A_l, [dst, #16]
+	stp	A_l, A_l, [dst, #32]
+	subs	tmp2, tmp2, #64
+	stp	A_l, A_l, [dst, #48]
+	add	dst, dst, #64
+	b.ge	1b
+	/* We've overrun a bit, so adjust dst downwards.*/
+	add	dst, dst, tmp2
+2:
+	sub	count, count, zva_len_x
+3:
+	dc	zva, dst
+	add	dst, dst, zva_len_x
+	subs	count, count, zva_len_x
+	b.ge	3b
+	ands	count, count, zva_bits_x
+	b.ne	.Ltail_maybe_long
+	ret
 ENDPROC(memset)
-

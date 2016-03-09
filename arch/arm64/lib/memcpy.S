@@ -1,64 +1,74 @@
 /*
- *  linux/arch/arm/lib/memcpy.S
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2013 Linaro.
  *
- *  Author:	Nicolas Pitre
- *  Created:	Sep 28, 2005
- *  Copyright:	MontaVista Software, Inc.
+ * This code is based on glibc cortex strings work originally authored by Linaro
+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
+ * be found @
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+ * files/head:/src/aarch64/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-#define LDR1W_SHIFT	0
-#define STR1W_SHIFT	0
-
-	.macro ldr1w ptr reg abort
-	W(ldr) \reg, [\ptr], #4
+/*
+ * Copy a buffer from src to dest (alignment handled by the hardware)
+ *
+ * Parameters:
+ *	x0 - dest
+ *	x1 - src
+ *	x2 - n
+ * Returns:
+ *	x0 - dest
+ */
+	.macro ldrb1 ptr, regB, val
+	ldrb  \ptr, [\regB], \val
 	.endm
 
-	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
-	ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4}
+	.macro strb1 ptr, regB, val
+	strb \ptr, [\regB], \val
 	.endm
 
-	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-	ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
+	.macro ldrh1 ptr, regB, val
+	ldrh  \ptr, [\regB], \val
 	.endm
 
-	.macro ldr1b ptr reg cond=al abort
-	ldr\cond\()b \reg, [\ptr], #1
+	.macro strh1 ptr, regB, val
+	strh \ptr, [\regB], \val
 	.endm
 
-	.macro str1w ptr reg abort
-	W(str) \reg, [\ptr], #4
+	.macro ldr1 ptr, regB, val
+	ldr \ptr, [\regB], \val
 	.endm
 
-	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-	stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
+	.macro str1 ptr, regB, val
+	str \ptr, [\regB], \val
 	.endm
 
-	.macro str1b ptr reg cond=al abort
-	str\cond\()b \reg, [\ptr], #1
+	.macro ldp1 ptr, regB, regC, val
+	ldp \ptr, \regB, [\regC], \val
 	.endm
 
-	.macro enter reg1 reg2
-	stmdb sp!, {r0, \reg1, \reg2}
+	.macro stp1 ptr, regB, regC, val
+	stp \ptr, \regB, [\regC], \val
 	.endm
 
-	.macro exit reg1 reg2
-	ldmfd sp!, {r0, \reg1, \reg2}
-	.endm
-
-	.text
-
-/* Prototype: void *memcpy(void *dest, const void *src, size_t n); */
-
+	.weak memcpy
 ENTRY(memcpy)
-
 #include "copy_template.S"
-
+	ret
 ENDPROC(memcpy)
-
