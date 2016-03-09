@@ -30,6 +30,7 @@
 #define CPU_ARCH_ARMv5TEJ	7
 #define CPU_ARCH_ARMv6		8
 #define CPU_ARCH_ARMv7		9
+#define CPU_ARCH_ARMv8		10
 
 #define ARM_CPU_PART_CORTEX_A5      0xC050
 #define ARM_CPU_PART_CORTEX_A7      0xC070
@@ -62,22 +63,22 @@ static int do_cpuinfo(int argc, char *argv[])
 	int cpu_arch;
 
 	__asm__ __volatile__(
-		"mrc    p15, 0, %0, c0, c0, 0   @ read control reg\n"
+		"mrs	%0, midr_el1\n"
 		: "=r" (mainid)
 		:
 		: "memory");
 
-	__asm__ __volatile__(
-		"mrc    p15, 0, %0, c0, c0, 1   @ read control reg\n"
-		: "=r" (cache)
-		:
-		: "memory");
-
-	__asm__ __volatile__(
-		"mrc    p15, 0, %0, c1, c0, 0   @ read control reg\n"
-			: "=r" (cr)
-			:
-			: "memory");
+//	__asm__ __volatile__(
+//		"mrc    p15, 0, %0, c0, c0, 1   @ read control reg\n"
+//		: "=r" (cache)
+//		:
+//		: "memory");
+//
+//	__asm__ __volatile__(
+//		"mrc    p15, 0, %0, c1, c0, 0   @ read control reg\n"
+//			: "=r" (cr)
+//			:
+//			: "memory");
 
 	switch (mainid >> 24) {
 	case 0x41:
@@ -112,8 +113,8 @@ static int do_cpuinfo(int argc, char *argv[])
 
 		/* Revised CPUID format. Read the Memory Model Feature
 		 * Register 0 and check for VMSAv7 or PMSAv7 */
-		asm("mrc	p15, 0, %0, c0, c1, 4"
-		    : "=r" (mmfr0));
+//		asm("mrc	p15, 0, %0, c0, c1, 4"
+//		    : "=r" (mmfr0));
 		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
 		    (mmfr0 & 0x000000f0) >= 0x00000030)
 			cpu_arch = CPU_ARCH_ARMv7;
@@ -153,7 +154,7 @@ static int do_cpuinfo(int argc, char *argv[])
 	case CPU_ARCH_ARMv7:
 		architecture = "v7";
 		break;
-	case CPU_ARM_ARMv8:
+	case CPU_ARCH_ARMv8:
 		architecture = "v8";
 		break;
 	case CPU_ARCH_UNKNOWN:
@@ -193,23 +194,23 @@ static int do_cpuinfo(int argc, char *argv[])
 		printf("core: %s r%up%u\n", part, major, minor);
 	}
 
-	if (cache & (1 << 24)) {
-		/* separate I/D cache */
-		printf("I-cache: ");
-		decode_cache(cache & 0xfff);
-		printf("D-cache: ");
-		decode_cache((cache >> 12) & 0xfff);
-	} else {
-		/* unified I/D cache */
-		printf("cache: ");
-		decode_cache(cache & 0xfff);
-	}
+//	if (cache & (1 << 24)) {
+//		/* separate I/D cache */
+//		printf("I-cache: ");
+//		decode_cache(cache & 0xfff);
+//		printf("D-cache: ");
+//		decode_cache((cache >> 12) & 0xfff);
+//	} else {
+//		/* unified I/D cache */
+//		printf("cache: ");
+//		decode_cache(cache & 0xfff);
+//	}
 
-	printf("Control register: ");
-	for (i = 0; i < ARRAY_SIZE(crbits); i++)
-		if (cr & (1 << i))
-			printf("%s ", crbits[i]);
-	printf("\n");
+//	printf("Control register: ");
+//	for (i = 0; i < ARRAY_SIZE(crbits); i++)
+//		if (cr & (1 << i))
+//			printf("%s ", crbits[i]);
+//	printf("\n");
 
 	return 0;
 }
