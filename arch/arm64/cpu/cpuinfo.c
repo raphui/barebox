@@ -36,6 +36,7 @@
 #define ARM_CPU_PART_CORTEX_A8      0xC080
 #define ARM_CPU_PART_CORTEX_A9      0xC090
 #define ARM_CPU_PART_CORTEX_A15     0xC0F0
+#define ARM_CPU_PART_CORTEX_A53	    0xD034
 
 static void decode_cache(unsigned long size)
 {
@@ -152,6 +153,9 @@ static int do_cpuinfo(int argc, char *argv[])
 	case CPU_ARCH_ARMv7:
 		architecture = "v7";
 		break;
+	case CPU_ARM_ARMv8:
+		architecture = "v8";
+		break;
 	case CPU_ARCH_UNKNOWN:
 	default:
 		architecture = "Unknown";
@@ -181,6 +185,8 @@ static int do_cpuinfo(int argc, char *argv[])
 		case ARM_CPU_PART_CORTEX_A15:
 			part = "Cortex-A15";
 			break;
+		case ARM_CPU_PART_CORTEX_A53:
+			part = "Cortex-A53";
 		default:
 			part = "unknown";
 		}
