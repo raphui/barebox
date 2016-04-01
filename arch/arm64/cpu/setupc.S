@@ -13,30 +13,31 @@
  */
 ENTRY(setup_c)
 #if 0
-	push	{r4, r5}
-	mov	r5, lr
+	push	{x4, x5}
+	mov	x5, lr
 	bl	get_runtime_offset
-	subs	r4, r0, #0
+	subs	x4, x0, #0
 	beq	1f			/* skip memcpy if already at correct address */
-	ldr	r0,=_text
-	ldr	r2,=__bss_start
-	sub	r2, r2, r0
-	sub	r1, r0, r4
+	ldr	x0,=_text
+	ldr	x2,=__bss_start
+	sub	x2, x2, x0
+	sub	x1, x0, x4
 	bl	memcpy			/* memcpy(_text, _text - offset, __bss_start - _text) */
-1:	ldr	r0, =__bss_start
-	mov	r1, #0
-	ldr	r2, =__bss_stop
-	sub	r2, r2, r0
+1:	ldr	x0, =__bss_start
+	mov	x1, #0
+	ldr	x2, =__bss_stop
+	sub	x2, x2, x0
 	bl	memset			/* clear bss */
 #ifdef CONFIG_MMU
 	bl	arm_early_mmu_cache_flush
 #endif
-	mov	r0, #0
-	mcr	p15, 0, r0, c7, c5, 0	/* flush icache */
-	add	lr, r5, r4		/* adjust return address to new location */
-	pop	{r4, r5}
-	mov	pc, lr
+	mov	x0, #0
+	bl	v8_invalidate_icache_all
+	add	x6, x5, x4		/* adjust return address to new location */
+	pop	{x4, x5}
+	mov	pc, x6
 #endif
+	ret
 ENDPROC(setup_c)
 
 /*

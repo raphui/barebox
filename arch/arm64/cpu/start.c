@@ -220,7 +220,7 @@ __noreturn void barebox_non_pbl_start(unsigned long membase,
 	pr_debug("initializing malloc pool at 0x%08lx (size 0x%08lx)\n",
 			malloc_start, malloc_end - malloc_start);
 
-	mem_malloc_init((void *)malloc_start, (void *)malloc_end - 1);
+//	mem_malloc_init((void *)malloc_start, (void *)malloc_end - 1);
 
 	pr_debug("starting barebox...\n");
 

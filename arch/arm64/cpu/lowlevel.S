@@ -37,7 +37,28 @@ ENTRY(arm_cpu_lowlevel_init)
 	b	done
 
 done:
+
 #if 1
+
+        mov     w9, #0x37               /* EnableGrp0 | EnableGrp1NS */
+                                       /* EnableGrp1S | ARE_S | ARE_NS */
+        str     w9, [x0, GICD_CTLR]     /* Secure GICD_CTLR */
+	ldr     w9, [x0, GICD_TYPER]
+	and     w10, w9, #0x1f          /* ITLinesNumber */
+	cbz     w10, 1f                 /* No SPIs */
+	add     x11, x0, (GICD_IGROUPRn + 4)
+	add     x12, x0, (GICD_IGROUPMODRn + 4)
+	mov     w9, #~0
+0:	str     w9, [x11], #0x4
+	str     wzr, [x12], #0x4        /* Config SPIs as Group1NS */
+	sub     w10, w10, #0x1
+	cbnz    w10, 0b
+
+1:	ret
+
+#endif 
+
+#if 0
 	ldr	x1, =GIC_DIST_BASE		// GICD_CTLR
 	mov	w0, #3				// EnableGrp0 | EnableGrp1
 	str	w0, [x1]
@@ -59,6 +80,14 @@ done:
 
 	msr	sctlr_el2, xzr
 #endif
+
+	// USART init
+	ldr	x4, =0x1c090000
+	mov	w5, #0x10			// ibrd
+	str	w5, [x4, #0x24]
+	mov	w5, #0xc300
+	orr	w5, w5, #0x0001			// cr
+	str	w5, [x4, #0x30]
 
 	ret
 
