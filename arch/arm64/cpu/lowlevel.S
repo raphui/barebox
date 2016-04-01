@@ -37,7 +37,7 @@ ENTRY(arm_cpu_lowlevel_init)
 	b	done
 
 done:
-#if 0
+#if 1
 	ldr	x1, =GIC_DIST_BASE		// GICD_CTLR
 	mov	w0, #3				// EnableGrp0 | EnableGrp1
 	str	w0, [x1]

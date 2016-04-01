@@ -1,6 +1,24 @@
 #ifndef __GIC_H__
 #define __GIC_H__
 
+/* Generic Interrupt Controller Definitions */
+//#ifdef CONFIG_GICV3
+//#define GICD_BASE                       (0x2f000000)
+//#define GICR_BASE                       (0x2f100000)
+//#else
+
+//#if defined(CONFIG_TARGET_VEXPRESS64_BASE_FVP) || \
+        defined(CONFIG_TARGET_VEXPRESS64_BASE_FVP_DRAM)
+//#define GICD_BASE                       (0x2f000000)
+//#define GICC_BASE                       (0x2c000000)
+//#elif CONFIG_TARGET_VEXPRESS64_JUNO
+#define GIC_DIST_BASE                       (0x2C010000)
+#define GIC_CPU_BASE                       (0x2C02f000)
+//#else
+//#error "Unknown board variant"
+//#endif
+//#endif /* !CONFIG_GICV3 */
+
 /* Register offsets for the ARM generic interrupt controller (GIC) */
 
 #define GIC_DIST_OFFSET		0x1000
