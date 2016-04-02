@@ -45,7 +45,7 @@ done:
         str     w9, [x0, GICD_CTLR]     /* Secure GICD_CTLR */
 	ldr     w9, [x0, GICD_TYPER]
 	and     w10, w9, #0x1f          /* ITLinesNumber */
-	cbz     w10, 1f                 /* No SPIs */
+	cbz     w10, 3f                 /* No SPIs */
 	add     x11, x0, (GICD_IGROUPRn + 4)
 	add     x12, x0, (GICD_IGROUPMODRn + 4)
 	mov     w9, #~0
@@ -53,8 +53,6 @@ done:
 	str     wzr, [x12], #0x4        /* Config SPIs as Group1NS */
 	sub     w10, w10, #0x1
 	cbnz    w10, 0b
-
-1:	ret
 
 #endif 
 
@@ -81,7 +79,7 @@ done:
 	msr	sctlr_el2, xzr
 #endif
 
-	// USART init
+3:	// USART init
 	ldr	x4, =0x1c090000
 	mov	w5, #0x10			// ibrd
 	str	w5, [x4, #0x24]
