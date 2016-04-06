@@ -80,7 +80,8 @@ done:
 #endif
 
 3:	// USART init
-	ldr	x4, =0x1c090000
+	//ldr	x4, =0x1c090000
+	ldr	x4, =0x09000000
 	mov	w5, #0x10			// ibrd
 	str	w5, [x4, #0x24]
 	mov	w5, #0xc300

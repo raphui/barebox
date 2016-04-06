@@ -79,7 +79,7 @@ SECTIONS
   __exceptions_stop = .;
   *(.text*)
  }
- _barebox_bare_init_size = __bare_init_end - _text; ASSERT(_barebox_bare_init_size < 0xffffffff, "Barebox bare_init size > ") ASSERT(_barebox_bare_init_size < 0xffffffff, "0xffffffff")
+ _barebox_bare_init_size = __bare_init_end - _text; ASSERT(_barebox_bare_init_size < 0x01000000, "Barebox bare_init size > ") ASSERT(_barebox_bare_init_size < 0x01000000, "0x01000000")
  . = ALIGN(4);
  .rodata : { *(.rodata*) }
  _etext = .; /* End of text and rodata section */
