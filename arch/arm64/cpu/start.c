@@ -151,7 +151,7 @@ __noreturn void barebox_non_pbl_start(unsigned long membase,
 		relocate_to_adr(barebox_base);
 	}
 
-	setup_c();
+//	setup_c();
 
 	barrier();
 

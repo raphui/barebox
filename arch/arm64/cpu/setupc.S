@@ -12,9 +12,8 @@
  * binary.
  */
 ENTRY(setup_c)
-#if 0
-	push	{x4, x5}
-	mov	x5, lr
+#if 1
+	stp	x4, x5, [sp, #-16]!
 	bl	get_runtime_offset
 	subs	x4, x0, #0
 	beq	1f			/* skip memcpy if already at correct address */
@@ -34,10 +33,10 @@ ENTRY(setup_c)
 	mov	x0, #0
 	bl	v8_invalidate_icache_all
 	add	x6, x5, x4		/* adjust return address to new location */
-	pop	{x4, x5}
-	mov	pc, x6
-#endif
+	ldp	x4, x5, [sp], #16
+	mov	x30, x6
 	ret
+#endif
 ENDPROC(setup_c)
 
 /*

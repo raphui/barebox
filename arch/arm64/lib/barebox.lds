@@ -63,7 +63,7 @@ OUTPUT_ARCH(aarch64)
 ENTRY(start)
 SECTIONS
 {
- . = 0x00000000;
+ . = 0x40000000;
 
  . = ALIGN(4);
  .text :
@@ -121,5 +121,5 @@ SECTIONS
  .bss : { *(.bss*) }
  __bss_stop = .;
  _end = .;
- _barebox_image_size = __bss_start - 0x00000000;
+ _barebox_image_size = __bss_start - 0x40000000;
 }

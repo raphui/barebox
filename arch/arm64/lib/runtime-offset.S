@@ -8,11 +8,11 @@
  * we are currently running at.
  */
 ENTRY(get_runtime_offset)
-1:	adr r0, 1b
-	ldr r1, linkadr
-	subs r0, r1, r0
-THUMB(	subs r0, r0, #1)
-	mov pc, lr
+1:	adr x0, 1b
+	adr x1, get_runtime_offset
+	subs x0, x1, x0
+	subs x0, x0, #1
+	ret
 
 linkadr:
 .word get_runtime_offset
@@ -28,7 +28,7 @@ __ld_var_base:
  */
 .macro ld_var_entry name
 	ENTRY(__ld_var_\name)
-		ldr r0, __\name
+		ldr x0, __\name
 		b 1f
 	__\name: .word \name - __ld_var_base
 	ENDPROC(__ld_var_\name)
@@ -47,6 +47,6 @@ ld_var_entry __image_end
 #endif
 
 1:
-	ldr r1, =__ld_var_base
-	adds r0, r0, r1
-	mov pc, lr
+	ldr x1, =__ld_var_base
+	adds x0, x0, x1
+	ret
