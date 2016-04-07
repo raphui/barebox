@@ -2,6 +2,7 @@
 #include <init.h>
 #include <asm/system.h>
 #include <asm/gic.h>
+#include <asm-generic/memory_layout.h>
 
 .section ".text_bare_init_","ax"
 
@@ -80,6 +81,7 @@ done:
 #endif
 
 3:	// USART init
+#if 1
 	//ldr	x4, =0x1c090000
 	ldr	x4, =0x09000000
 	mov	w5, #0x10			// ibrd
@@ -87,6 +89,15 @@ done:
 	mov	w5, #0xc300
 	orr	w5, w5, #0x0001			// cr
 	str	w5, [x4, #0x30]
+#endif
+
+#if 1
+	ldr	x1, =0x60000000
+	mov	sp, x1
+	mov     x29, #0
+	stp     x29, x29, [sp, #-16]!
+	mov     x29, sp
+#endif
 
 	ret
 
