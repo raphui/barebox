@@ -1,0 +1,15 @@
+if ARCH_VIRT
+
+config ARCH_TEXT_BASE
+	hex
+	default 0x40000000
+
+choice
+	prompt "ARM Board type"
+
+config MACH_VIRT
+	bool "ARM QEMU virt"
+
+endchoice
+
+endif
