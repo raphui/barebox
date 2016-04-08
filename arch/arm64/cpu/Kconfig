@@ -1,0 +1,54 @@
+comment "Processor Type"
+
+config CPU_64
+	bool
+	default y
+
+# Select CPU types depending on the architecture selected. This selects
+# which CPUs we support in the kernel image, and the compiler instruction
+# optimiser behaviour.
+
+# ARMv8
+config CPU_V8
+	bool
+	select CPU_64v8
+	select CPU_SUPPORTS_64BIT_KERNEL
+
+config CPU_64v8
+	bool
+
+comment "processor features"
+
+config ARCH_SUPPORTS_BIG_ENDIAN
+	bool
+
+config CPU_BIG_ENDIAN
+	bool "Build big-endian kernel"
+	depends on ARCH_SUPPORTS_BIG_ENDIAN
+	help
+	  Say Y if you plan on running a kernel in big-endian mode.
+	  Note that your board must be properly built and your board
+	  port must properly enable any big-endian related features
+	  of your chipset/board/processor.
+
+config BOOT_ENDIANNESS_SWITCH
+	bool "Support switching of Linux kernel endianness"
+	help
+	  Say Y here if you need to switch CPU endianness before running
+	  Linux kernel, e.g. if you want big-endian Barebox to run
+	  little-endian Linux.
+
+	  Currently implemented only by "bootz" command.
+
+config SYS_SUPPORTS_32BIT_KERNEL
+	bool
+
+config SYS_SUPPORTS_64BIT_KERNEL
+	bool
+
+config CPU_SUPPORTS_32BIT_KERNEL
+	bool
+
+config CPU_SUPPORTS_64BIT_KERNEL
+	bool
+
