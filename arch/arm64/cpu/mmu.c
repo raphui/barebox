@@ -54,15 +54,7 @@ static void create_sections(unsigned long virt, unsigned long phys, int size_m,
  */
 static inline void tlb_invalidate(void)
 {
-	asm volatile (
-		"mov	r0, #0\n"
-		"mcr	p15, 0, r0, c7, c10, 4;	@ drain write buffer\n"
-		"mcr	p15, 0, r0, c8, c6, 0;  @ invalidate D TLBs\n"
-		"mcr	p15, 0, r0, c8, c5, 0;  @ invalidate I TLBs\n"
-		:
-		:
-		: "r0"
-	);
+	v8_invalidate_icache_all();
 }
 
 #define PTE_FLAGS_CACHED_V7 (PTE_EXT_TEX(1) | PTE_BUFFERABLE | PTE_CACHEABLE)
