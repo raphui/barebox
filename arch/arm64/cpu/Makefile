@@ -8,8 +8,7 @@ obj-y += start.o entry.o
 #
 obj-$(CONFIG_CMD_ARM_CPUINFO) += cpuinfo.o
 obj-$(CONFIG_CMD_ARM_MMUINFO) += mmuinfo.o
-obj-$(CONFIG_MMU) += mmu.o cache.o mmu-early.o
-pbl-$(CONFIG_MMU) += mmu-early.o
+obj-$(CONFIG_MMU) += mmu.o cache.o
 
 ifeq ($(CONFIG_MMU),)
 #obj-y += no-mmu.o

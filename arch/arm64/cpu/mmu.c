@@ -32,54 +32,8 @@
 
 #include "mmu.h"
 
-static unsigned long *ttb;
-
-static void create_sections(unsigned long virt, unsigned long phys, int size_m,
-		unsigned int flags)
-{
-	int i;
-
-	phys >>= 20;
-	virt >>= 20;
-
-	for (i = size_m; i > 0; i--, virt++, phys++)
-		ttb[virt] = (phys << 20) | flags;
-
-	__mmu_cache_flush();
-}
-
-/*
- * Do it the simple way for now and invalidate the entire
- * tlb
- */
-static inline void tlb_invalidate(void)
-{
-	asm volatile (
-		"mov	r0, #0\n"
-		"mcr	p15, 0, r0, c7, c10, 4;	@ drain write buffer\n"
-		"mcr	p15, 0, r0, c8, c6, 0;  @ invalidate D TLBs\n"
-		"mcr	p15, 0, r0, c8, c5, 0;  @ invalidate I TLBs\n"
-		:
-		:
-		: "r0"
-	);
-}
-
-#define PTE_FLAGS_CACHED_V7 (PTE_EXT_TEX(1) | PTE_BUFFERABLE | PTE_CACHEABLE)
-#define PTE_FLAGS_WC_V7 PTE_EXT_TEX(1)
-#define PTE_FLAGS_UNCACHED_V7 (0)
-#define PTE_FLAGS_CACHED_V4 (PTE_SMALL_AP_UNO_SRW | PTE_BUFFERABLE | PTE_CACHEABLE)
-#define PTE_FLAGS_UNCACHED_V4 PTE_SMALL_AP_UNO_SRW
-
-/*
- * PTE flags to set cached and uncached areas.
- * This will be determined at runtime.
- */
-static uint32_t pte_flags_cached;
-static uint32_t pte_flags_wc;
-static uint32_t pte_flags_uncached;
-
-#define PTE_MASK ((1 << 12) - 1)
+static uint64_t *ttb;
+static int free_idx;
 
 static void arm_mmu_not_initialized_error(void)
 {
@@ -92,239 +46,173 @@ static void arm_mmu_not_initialized_error(void)
 	panic("MMU not initialized\n");
 }
 
+
 /*
- * Create a second level translation table for the given virtual address.
- * We initially create a flat uncached mapping on it.
- * Not yet exported, but may be later if someone finds use for it.
+ * Do it the simple way for now and invalidate the entire
+ * tlb
  */
-static u32 *arm_create_pte(unsigned long virt)
+static inline void tlb_invalidate(void)
 {
-	u32 *table;
-	int i;
+	unsigned int el = current_el();
 
-	table = memalign(0x400, 0x400);
+	dsb();
 
-	if (!ttb)
-		arm_mmu_not_initialized_error();
+	if (el == 1)
+		__asm__ __volatile__("tlbi alle1\n\t" : : : "memory");
+	else if (el == 2)
+		__asm__ __volatile__("tlbi alle2\n\t" : : : "memory");
+	else if (el == 3)
+		__asm__ __volatile__("tlbi alle3\n\t" : : : "memory");
 
-	ttb[virt >> 20] = (unsigned long)table | PMD_TYPE_TABLE;
+	dsb();
+	isb();
+}
 
-	for (i = 0; i < 256; i++) {
-		table[i] = virt | PTE_TYPE_SMALL | pte_flags_uncached;
-		virt += PAGE_SIZE;
+static int level2shift(int level)
+{
+	/* Page is 12 bits wide, every level translates 9 bits */
+	return (12 + 9 * (3 - level));
+}
+
+static uint64_t level2mask(int level)
+{
+	uint64_t mask = -EINVAL;
+
+	if (level == 1)
+		mask = L1_ADDR_MASK;
+	else if (level == 2)
+		mask = L2_ADDR_MASK;
+	else if (level == 3)
+		mask = L3_ADDR_MASK;
+
+	return mask;
+}
+
+static int pte_type(uint64_t *pte)
+{
+	return *pte & PMD_TYPE_MASK;
+}
+
+static void set_table(uint64_t *pt, uint64_t *table_addr)
+{
+	uint64_t val;
+
+	val = PMD_TYPE_TABLE | (uint64_t)table_addr;
+	*pt = val;
+}
+
+static uint64_t *create_table(void)
+{
+	uint64_t *new_table = ttb + free_idx * GRANULE_SIZE;
+
+	/* Mark all entries as invalid */
+	memset(new_table, 0, GRANULE_SIZE);
+
+	free_idx++;
+
+	return new_table;
+}
+
+static uint64_t *get_level_table(uint64_t *pte)
+{
+	uint64_t *table = (uint64_t *)(*pte & XLAT_ADDR_MASK);
+
+	if (pte_type(pte) != PMD_TYPE_TABLE) {
+		table = create_table();
+		set_table(pte, table);
 	}
 
 	return table;
 }
 
-static u32 *find_pte(unsigned long adr)
+static uint64_t *find_pte(uint64_t addr)
 {
-	u32 *table;
+	uint64_t *pte;
+	uint64_t block_shift;
+	uint64_t idx;
+	int i;
+
+	pte = ttb;
+
+	for (i = 1; i < 4; i++) {
+		block_shift = level2shift(i);
+		idx = (addr & level2mask(i)) >> block_shift;
+		pte += idx;
+
+		if ((pte_type(pte) != PMD_TYPE_TABLE) || (block_shift <= GRANULE_SIZE_SHIFT))
+			break;
+		else
+			pte = (uint64_t *)(*pte & XLAT_ADDR_MASK);
+	}
+
+	return pte;
+}
+
+static void map_region(uint64_t virt, uint64_t phys, uint64_t size, uint64_t attr)
+{
+	uint64_t block_size;
+	uint64_t block_shift;
+	uint64_t *pte;
+	uint64_t idx;
+	uint64_t addr;
+	uint64_t *table;
+	int level;
 
 	if (!ttb)
 		arm_mmu_not_initialized_error();
 
-	if ((ttb[adr >> 20] & PMD_TYPE_MASK) != PMD_TYPE_TABLE) {
-		struct memory_bank *bank;
-		int i = 0;
+	addr = virt;
 
-		/*
-		 * This should only be called for page mapped memory inside our
-		 * memory banks. It's a bug to call it with section mapped memory
-		 * locations.
-		 */
-		pr_crit("%s: TTB for address 0x%08lx is not of type table\n",
-				__func__, adr);
-		pr_crit("Memory banks:\n");
-		for_each_memory_bank(bank)
-			pr_crit("#%d 0x%08lx - 0x%08lx\n", i, bank->start,
-					bank->start + bank->size - 1);
-		BUG();
+	attr &= ~(PMD_TYPE_SECT);
+
+	while (size) {
+		table = ttb;
+		for (level = 1; level < 4; level++) {
+			block_shift = level2shift(level);
+			idx = (addr & level2mask(level)) >> block_shift;
+			block_size = (1 << block_shift);
+
+			pte = table + idx;
+
+			if (level == 3)
+				attr |= PMD_TYPE_PAGE;
+			else
+				attr |= PMD_TYPE_SECT;
+
+			if (size >= block_size && IS_ALIGNED(addr, block_size)) {
+				*pte = phys | attr;
+				addr += block_size;
+				phys += block_size;
+				size -= block_size;
+				break;
+
+			}
+
+			table = get_level_table(pte);
+		}
+
 	}
-
-	/* find the coarse page table base address */
-	table = (u32 *)(ttb[adr >> 20] & ~0x3ff);
-
-	/* find second level descriptor */
-	return &table[(adr >> PAGE_SHIFT) & 0xff];
 }
 
-static void dma_flush_range(unsigned long start, unsigned long end)
+static void create_sections(uint64_t virt, uint64_t phys, uint64_t size_m, uint64_t flags)
 {
-	__dma_flush_range(start, end);
-	if (outer_cache.flush_range)
-		outer_cache.flush_range(start, end);
+
+	map_region(virt, phys, size_m, flags);
 }
 
-static void dma_inv_range(unsigned long start, unsigned long end)
+static void map_cachable(uint64_t start, uint64_t size)
 {
-	if (outer_cache.inv_range)
-		outer_cache.inv_range(start, end);
-	__dma_inv_range(start, end);
+	map_region(start, start, size, PMD_SECT_AP_WRITE |
+			PMD_SECT_AP_READ | PMD_TYPE_SECT | PMD_SECT_WB);
 }
 
-static int __remap_range(void *_start, size_t size, u32 pte_flags)
+void *map_io_sections(uint64_t phys, void *_start, size_t size)
 {
-	unsigned long start = (unsigned long)_start;
-	u32 *p;
-	int numentries, i;
 
-	numentries = size >> PAGE_SHIFT;
-	p = find_pte(start);
+	map_region((uint64_t)_start, phys, (uint64_t)size, PMD_SECT_DEF_UNCACHED);
 
-	for (i = 0; i < numentries; i++) {
-		p[i] &= ~PTE_MASK;
-		p[i] |= pte_flags | PTE_TYPE_SMALL;
-	}
-
-	dma_flush_range((unsigned long)p,
-			(unsigned long)p + numentries * sizeof(u32));
-
-	tlb_invalidate();
-
-	return 0;
-}
-
-int arch_remap_range(void *start, size_t size, unsigned flags)
-{
-	u32 pte_flags;
-
-	switch (flags) {
-	case MAP_CACHED:
-		pte_flags = pte_flags_cached;
-		break;
-	case MAP_UNCACHED:
-		pte_flags = pte_flags_uncached;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return __remap_range(start, size, pte_flags);
-}
-
-void *map_io_sections(unsigned long phys, void *_start, size_t size)
-{
-	unsigned long start = (unsigned long)_start, sec;
-
-	phys >>= 20;
-	for (sec = start; sec < start + size; sec += (1 << 20))
-		ttb[sec >> 20] = (phys++ << 20) | PMD_SECT_DEF_UNCACHED;
-
-	dma_flush_range((unsigned long)ttb, (unsigned long)ttb + 0x4000);
 	tlb_invalidate();
 	return _start;
-}
-
-/*
- * remap the memory bank described by mem cachable and
- * bufferable
- */
-static int arm_mmu_remap_sdram(struct memory_bank *bank)
-{
-	unsigned long phys = (unsigned long)bank->start;
-	unsigned long ttb_start = phys >> 20;
-	unsigned long ttb_end = (phys >> 20) + (bank->size >> 20);
-	unsigned long num_ptes = bank->size >> 12;
-	int i, pte;
-	u32 *ptes;
-
-	pr_debug("remapping SDRAM from 0x%08lx (size 0x%08lx)\n",
-			phys, bank->size);
-
-	/*
-	 * We replace each 1MiB section in this range with second level page
-	 * tables, therefore we must have 1Mib aligment here.
-	 */
-	if ((phys & (SZ_1M - 1)) || (bank->size & (SZ_1M - 1)))
-		return -EINVAL;
-
-	ptes = xmemalign(PAGE_SIZE, num_ptes * sizeof(u32));
-
-	pr_debug("ptes: 0x%p ttb_start: 0x%08lx ttb_end: 0x%08lx\n",
-			ptes, ttb_start, ttb_end);
-
-	for (i = 0; i < num_ptes; i++) {
-		ptes[i] = (phys + i * PAGE_SIZE) | PTE_TYPE_SMALL |
-			pte_flags_cached;
-	}
-
-	pte = 0;
-
-	for (i = ttb_start; i < ttb_end; i++) {
-		ttb[i] = (unsigned long)(&ptes[pte]) | PMD_TYPE_TABLE |
-			(0 << 4);
-		pte += 256;
-	}
-
-	dma_flush_range((unsigned long)ttb, (unsigned long)ttb + 0x4000);
-	dma_flush_range((unsigned long)ptes,
-			(unsigned long)ptes + num_ptes * sizeof(u32));
-
-	tlb_invalidate();
-
-	return 0;
-}
-/*
- * We have 8 exception vectors and the table consists of absolute
- * jumps, so we need 8 * 4 bytes for the instructions and another
- * 8 * 4 bytes for the addresses.
- */
-#define ARM_VECTORS_SIZE	(sizeof(u32) * 8 * 2)
-
-/*
- * Map vectors and zero page
- */
-static void vectors_init(void)
-{
-	u32 *exc, *zero = NULL;
-	void *vectors;
-	u32 cr;
-
-	cr = get_cr();
-	cr |= CR_V;
-	set_cr(cr);
-	cr = get_cr();
-
-	if (cr & CR_V) {
-		/*
-		 * If we can use high vectors, create the second level
-		 * page table for the high vectors and zero page
-		 */
-		exc = arm_create_pte(0xfff00000);
-		zero = arm_create_pte(0x0);
-
-		/* Set the zero page to faulting */
-		zero[0] = 0;
-	} else {
-		/*
-		 * Otherwise map the vectors to the zero page. We have to
-		 * live without being able to catch NULL pointer dereferences
-		 */
-		exc = arm_create_pte(0x0);
-
-		if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-			/*
-			 * ARMv7 CPUs allow to remap low vectors from
-			 * 0x0 to an arbitrary address using VBAR
-			 * register, so let's make sure we have it
-			 * pointing to the correct address
-			 */
-			set_vbar(0x0);
-		}
-	}
-
-	arm_fixup_vectors();
-
-	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
-	memset(vectors, 0, PAGE_SIZE);
-	memcpy(vectors, __exceptions_start, __exceptions_stop - __exceptions_start);
-
-	if (cr & CR_V)
-		exc[256 - 16] = (u32)vectors | PTE_TYPE_SMALL |
-			pte_flags_cached;
-	else
-		exc[0] = (u32)vectors | PTE_TYPE_SMALL | pte_flags_cached;
 }
 
 /*
@@ -333,7 +221,6 @@ static void vectors_init(void)
 static int mmu_init(void)
 {
 	struct memory_bank *bank;
-	int i;
 
 	if (list_empty(&memory_banks))
 		/*
@@ -344,56 +231,31 @@ static int mmu_init(void)
 		 */
 		panic("MMU: No memory bank found! Cannot continue\n");
 
-	arm_set_cache_functions();
-
-	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-		pte_flags_cached = PTE_FLAGS_CACHED_V7;
-		pte_flags_wc = PTE_FLAGS_WC_V7;
-		pte_flags_uncached = PTE_FLAGS_UNCACHED_V7;
-	} else {
-		pte_flags_cached = PTE_FLAGS_CACHED_V4;
-		pte_flags_wc = PTE_FLAGS_UNCACHED_V4;
-		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
-	}
-
-	if (get_cr() & CR_M) {
-		/*
-		 * Early MMU code has already enabled the MMU. We assume a
-		 * flat 1:1 section mapping in this case.
-		 */
-		asm volatile ("mrc  p15,0,%0,c2,c0,0" : "=r"(ttb));
-
-		/* Clear unpredictable bits [13:0] */
-		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
-
+	if (get_sctlr() & CR_M) {
+		ttb = (uint64_t *)get_ttbr(1);
 		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
 			/*
-			 * This can mean that:
-			 * - the early MMU code has put the ttb into a place
-			 *   which we don't have inside our available memory
-			 * - Somebody else has occupied the ttb region which means
-			 *   the ttb will get corrupted.
-			 */
+			* This can mean that:
+			* - the early MMU code has put the ttb into a place
+			*   which we don't have inside our available memory
+			* - Somebody else has occupied the ttb region which means
+			*   the ttb will get corrupted.
+			*/
 			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
-					ttb);
+				ttb);
 	} else {
-		ttb = memalign(0x10000, 0x4000);
+		ttb = memalign(0x1000, SZ_16K);
+		free_idx = 1;
+
+		memset(ttb, 0, GRANULE_SIZE);
+
+		set_ttbr_tcr_mair(1, (uint64_t)ttb, TCR_FLAGS, MEMORY_ATTR);
 	}
 
 	pr_debug("ttb: 0x%p\n", ttb);
 
-	/* Set the ttb register */
-	asm volatile ("mcr  p15,0,%0,c2,c0,0" : : "r"(ttb) /*:*/);
-
-	/* Set the Domain Access Control Register */
-	i = 0x3;
-	asm volatile ("mcr  p15,0,%0,c3,c0,0" : : "r"(i) /*:*/);
-
 	/* create a flat mapping using 1MiB sections */
-	create_sections(0, 0, PAGE_SIZE, PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
-			PMD_TYPE_SECT);
-
-	vectors_init();
+	create_sections(0, 0, GRANULE_SIZE, PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | PMD_TYPE_SECT);
 
 	/*
 	 * First remap sdram cached using sections.
@@ -401,52 +263,37 @@ static int mmu_init(void)
 	 * below
 	 */
 	for_each_memory_bank(bank)
-		create_sections(bank->start, bank->start, bank->size >> 20,
-				PMD_SECT_DEF_CACHED);
+		create_sections(bank->start, bank->start, bank->size, PMD_SECT_DEF_CACHED);
 
-	__mmu_cache_on();
+	map_cachable(0x09000000, 0x01000000);
+	map_cachable(0x00000000, 0x08000000);
 
-	/*
-	 * Now that we have the MMU and caches on remap sdram again using
-	 * page tables
-	 */
-	for_each_memory_bank(bank)
-		arm_mmu_remap_sdram(bank);
+	if (!(get_sctlr() & CR_M))
+		set_sctlr(get_sctlr() | CR_M | CR_C | CR_I);
 
 	return 0;
 }
 mmu_initcall(mmu_init);
 
-void *dma_alloc_coherent(size_t size, dma_addr_t *dma_handle)
+void mmu_early_enable(uint64_t membase, uint64_t memsize, uint64_t _ttb)
 {
-	void *ret;
+	ttb = (uint64_t *)_ttb;
 
-	size = PAGE_ALIGN(size);
-	ret = xmemalign(PAGE_SIZE, size);
-	if (dma_handle)
-		*dma_handle = (dma_addr_t)ret;
+	memset(ttb, 0, GRANULE_SIZE);
+	free_idx = 1;
 
-	dma_inv_range((unsigned long)ret, (unsigned long)ret + size);
+	set_ttbr_tcr_mair(1, (uint64_t)ttb, TCR_FLAGS, MEMORY_ATTR);
 
-	__remap_range(ret, size, pte_flags_uncached);
+	create_sections(0, 0, 4096, PMD_SECT_AP_WRITE |
+			PMD_SECT_AP_READ | PMD_TYPE_SECT);
 
-	return ret;
-}
+	map_cachable(membase, memsize);
+	map_cachable(0x09000000, 0x01000000);
+	map_cachable(0x00000000, 0x08000000);
 
-void *dma_alloc_writecombine(size_t size, dma_addr_t *dma_handle)
-{
-	void *ret;
-
-	size = PAGE_ALIGN(size);
-	ret = xmemalign(PAGE_SIZE, size);
-	if (dma_handle)
-		*dma_handle = (dma_addr_t)ret;
-
-	dma_inv_range((unsigned long)ret, (unsigned long)ret + size);
-
-	__remap_range(ret, size, pte_flags_wc);
-
-	return ret;
+	isb();
+	set_sctlr(get_sctlr() | CR_M);
+	isb();
 }
 
 unsigned long virt_to_phys(volatile void *virt)
@@ -457,36 +304,4 @@ unsigned long virt_to_phys(volatile void *virt)
 void *phys_to_virt(unsigned long phys)
 {
 	return (void *)phys;
-}
-
-void dma_free_coherent(void *mem, dma_addr_t dma_handle, size_t size)
-{
-	size = PAGE_ALIGN(size);
-	__remap_range(mem, size, pte_flags_cached);
-
-	free(mem);
-}
-
-void dma_sync_single_for_cpu(unsigned long address, size_t size,
-			     enum dma_data_direction dir)
-{
-	if (dir != DMA_TO_DEVICE) {
-		if (outer_cache.inv_range)
-			outer_cache.inv_range(address, address + size);
-		__dma_inv_range(address, address + size);
-	}
-}
-
-void dma_sync_single_for_device(unsigned long address, size_t size,
-				enum dma_data_direction dir)
-{
-	if (dir == DMA_FROM_DEVICE) {
-		__dma_inv_range(address, address + size);
-		if (outer_cache.inv_range)
-			outer_cache.inv_range(address, address + size);
-	} else {
-		__dma_clean_range(address, address + size);
-		if (outer_cache.clean_range)
-			outer_cache.clean_range(address, address + size);
-	}
 }
