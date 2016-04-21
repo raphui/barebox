@@ -37,7 +37,7 @@ int	cleanup_before_linux(void);
 
 /* arch/<arch>board(s)/.../... */
 int	board_init(void);
-int	dram_init (void);
+int	dram_init(void);
 
 extern char __exceptions_start[], __exceptions_stop[];
 

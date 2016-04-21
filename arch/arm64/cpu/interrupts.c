@@ -36,7 +36,7 @@ static void __noreturn do_exception(struct pt_regs *pt_regs)
  * The CPU runs into an undefined instruction. That really should not happen!
  * @param[in] pt_regs Register set content when the accident happens
  */
-void do_undefined_instruction (struct pt_regs *pt_regs)
+void do_undefined_instruction(struct pt_regs *pt_regs)
 {
 	printf ("undefined instruction\n");
 	do_exception(pt_regs);
@@ -49,7 +49,7 @@ void do_undefined_instruction (struct pt_regs *pt_regs)
  * There is no function behind this feature. So what to do else than
  * a reset?
  */
-void do_software_interrupt (struct pt_regs *pt_regs)
+void do_software_interrupt(struct pt_regs *pt_regs)
 {
 	printf ("software interrupt\n");
 	do_exception(pt_regs);
@@ -61,7 +61,7 @@ void do_software_interrupt (struct pt_regs *pt_regs)
  *
  * instruction fetch from an unmapped area
  */
-void do_prefetch_abort (struct pt_regs *pt_regs)
+void do_prefetch_abort(struct pt_regs *pt_regs)
 {
 	printf ("prefetch abort\n");
 	do_exception(pt_regs);
@@ -73,7 +73,7 @@ void do_prefetch_abort (struct pt_regs *pt_regs)
  *
  * data fetch from an unmapped area
  */
-void do_data_abort (struct pt_regs *pt_regs)
+void do_data_abort(struct pt_regs *pt_regs)
 {
 	u32 far;
 
@@ -90,7 +90,7 @@ void do_data_abort (struct pt_regs *pt_regs)
  *
  * We never enable FIQs, so this should not happen
  */
-void do_fiq (struct pt_regs *pt_regs)
+void do_fiq(struct pt_regs *pt_regs)
 {
 	printf ("fast interrupt request\n");
 	do_exception(pt_regs);
@@ -102,7 +102,7 @@ void do_fiq (struct pt_regs *pt_regs)
  *
  * We never enable interrupts, so this should not happen
  */
-void do_irq (struct pt_regs *pt_regs)
+void do_irq(struct pt_regs *pt_regs)
 {
 	printf ("interrupt request\n");
 	do_exception(pt_regs);
