@@ -79,7 +79,7 @@ int arm_set_cache_functions(void)
 		cache_fns = &cache_fns_armv8;
 		break;
 	default:
-		while(1);
+		while (1);
 	}
 
 	return 0;

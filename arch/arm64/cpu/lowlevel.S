@@ -29,7 +29,7 @@ ENTRY(arm_cpu_lowlevel_init)
 	mov	x0, #0x33ff		/* Enable FP/SIMD */
 	msr	cptr_el2, x0
 	b	done
-	
+
 
 3:
 	msr	vbar_el1, x0

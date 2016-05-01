@@ -24,7 +24,7 @@ ifeq ($(CONFIG_ARM_UNWIND),y)
 CFLAGS_ABI	+=-funwind-tables
 endif
 
-CPPFLAGS += $(CFLAGS_ABI) $(arch-y) $(tune-y) 
+CPPFLAGS += $(CFLAGS_ABI) $(arch-y) $(tune-y)
 
 AFLAGS   += -include asm/unified.h
 
@@ -86,12 +86,6 @@ archclean:
 	$(MAKE) $(clean)=$(pbl)
 
 KBUILD_IMAGE ?= $(KBUILD_BINARY)
-
-archprepare: maketools
-maketools:
-	$(Q)$(MAKE) $(build)=arch/arm64/tools include/generated/mach-types.h
-
-PHONY += maketools
 
 ifneq ($(board-y),)
 BOARD := arch/arm64/boards/$(board-y)/
