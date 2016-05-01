@@ -34,18 +34,101 @@
 
 static unsigned long *ttb;
 
+static int pte_type(uint64_t *pte)
+{
+	return *pte & PMD_TYPE_MASK;
+}
+
+static uint64_t *find_pte(uint64_t addr)
+{
+	uint64_t *pte = ttb;
+	uint64_t block_shift;
+	int i;
+	int idx;
+
+	if (!ttb)
+		arm_mmu_not_initialized_error();
+
+	for (i = 1; i < 4; i++) {
+		block_shift = level2shift(i);
+		idx = (addr >> block_shift) & 0x1FF;
+		pte += idx;
+
+		printf("idx=%llx PTE %p at level %d: %llx\n", idx, pte, i, *pte);
+
+		if ((pte_type(pte) != PMD_TYPE_TABLE) || (block_shift <= GRANULE_SIZE_SHIFT))
+			break;
+		else
+			pte = (uint64_t *)(*pte & XLAT_ADDR_MASK);	
+	}
+
+
+	return entry;
+}
+
+static void map_region(uint64_t virt, uint64_t phys, uint64_t size, uint64_t attr)
+{
+	uint64_t block_size;
+	uint64_t block_shift;
+	uint64_t *pte;
+	uint64_t idx;
+	uint64_t *table;
+	uint64_t addr;
+	int level;
+
+	table = table;
+
+	phys &= PAGE_MASK;
+	addr = virt & PAGE_MASK;
+
+	while (size) {
+		for (level = 1; level < 4; level++) {
+			idx = (addr & level2mask(level)) >> level2shift(level);
+			block_size = (1 << level2shift(level));
+
+			if (size >= block_size && IS_ALIGNED(addr, block_size)) {
+				pte = table + idx;
+				printf("virt at %llx pte at %llx at level %d remaining size %llx\n", virt, pte, level, size);
+				*pte = phys | attr;
+				phys += block_size;
+				addr += block_size;
+				size -= block_size;
+				break;
+
+			} else if (pte_type(pte) == PMD_TYPE_FAULT) {
+				table = xtables_create_table(pgd);
+				xtables_set_table(pte, table);
+			}
+		}
+
+	}
+}
+
 static void create_sections(unsigned long virt, unsigned long phys, int size_m,
 		unsigned int flags)
 {
-	int i;
-
-	phys >>= 20;
-	virt >>= 20;
-
-	for (i = size_m; i > 0; i--, virt++, phys++)
-		ttb[virt] = (phys << 20) | flags;
-
-	__mmu_cache_flush();
+	map_region(virt, phys, size_m, flags);
+//	int i;
+//	unsigned long addr;
+//	uint64_t *pte;
+//	int type;
+//
+//	phys &= PAGE_MASK;
+//	addr = virt & PAGE_MASK;
+//
+//	for (i = size_m; i > 0; i--, addr++, phys++) {
+//		pte = find_pte(addr);
+//		type = pte_type(pte);
+//
+//		if (type == PTE_SECT) {
+//			
+//		} else if (type == PTE_PAGE) {
+//
+//		}
+//	}
+//		ttb[virt] = (phys << 20) | flags;
+//
+//	__mmu_cache_flush();
 }
 
 /*
@@ -109,37 +192,37 @@ static u32 *arm_create_pte(unsigned long virt)
 	return table;
 }
 
-static u32 *find_pte(unsigned long adr)
-{
-	u32 *table;
-
-	if (!ttb)
-		arm_mmu_not_initialized_error();
-
-	if ((ttb[adr >> 20] & PMD_TYPE_MASK) != PMD_TYPE_TABLE) {
-		struct memory_bank *bank;
-		int i = 0;
-
-		/*
-		 * This should only be called for page mapped memory inside our
-		 * memory banks. It's a bug to call it with section mapped memory
-		 * locations.
-		 */
-		pr_crit("%s: TTB for address 0x%08lx is not of type table\n",
-				__func__, adr);
-		pr_crit("Memory banks:\n");
-		for_each_memory_bank(bank)
-			pr_crit("#%d 0x%08lx - 0x%08lx\n", i, bank->start,
-					bank->start + bank->size - 1);
-		BUG();
-	}
-
-	/* find the coarse page table base address */
-	table = (u32 *)(ttb[adr >> 20] & ~0x3ff);
-
-	/* find second level descriptor */
-	return &table[(adr >> PAGE_SHIFT) & 0xff];
-}
+//static uint64_t *find_pte(unsigned long adr)
+//{
+//	u32 *table;
+//
+//	if (!ttb)
+//		arm_mmu_not_initialized_error();
+//
+//	if ((ttb[adr >> 20] & PMD_TYPE_MASK) != PMD_TYPE_TABLE) {
+//		struct memory_bank *bank;
+//		int i = 0;
+//
+//		/*
+//		 * This should only be called for page mapped memory inside our
+//		 * memory banks. It's a bug to call it with section mapped memory
+//		 * locations.
+//		 */
+//		pr_crit("%s: TTB for address 0x%08lx is not of type table\n",
+//				__func__, adr);
+//		pr_crit("Memory banks:\n");
+//		for_each_memory_bank(bank)
+//			pr_crit("#%d 0x%08lx - 0x%08lx\n", i, bank->start,
+//					bank->start + bank->size - 1);
+//		BUG();
+//	}
+//
+//	/* find the coarse page table base address */
+//	table = (u32 *)(ttb[adr >> 20] & ~0x3ff);
+//
+//	/* find second level descriptor */
+//	return &table[(adr >> PAGE_SHIFT) & 0xff];
+//}
 
 static void dma_flush_range(unsigned long start, unsigned long end)
 {
@@ -197,15 +280,15 @@ int arch_remap_range(void *start, size_t size, unsigned flags)
 
 void *map_io_sections(unsigned long phys, void *_start, size_t size)
 {
-	unsigned long start = (unsigned long)_start, sec;
-
-	phys >>= 20;
-	for (sec = start; sec < start + size; sec += (1 << 20))
-		ttb[sec >> 20] = (phys++ << 20) | PMD_SECT_DEF_UNCACHED;
-
-	dma_flush_range((unsigned long)ttb, (unsigned long)ttb + 0x4000);
-	tlb_invalidate();
-	return _start;
+//	unsigned long start = (unsigned long)_start, sec;
+//
+//	phys >>= 20;
+//	for (sec = start; sec < start + size; sec += (1 << 20))
+//		ttb[sec >> 20] = (phys++ << 20) | PMD_SECT_DEF_UNCACHED;
+//
+//	dma_flush_range((unsigned long)ttb, (unsigned long)ttb + 0x4000);
+//	tlb_invalidate();
+//	return _start;
 }
 
 /*
@@ -273,12 +356,12 @@ static void vectors_init(void)
 	void *vectors;
 	u32 cr;
 
-	cr = get_cr();
-	cr |= CR_V;
-	set_cr(cr);
-	cr = get_cr();
-
-	if (cr & CR_V) {
+//	cr = get_cr();
+//	cr |= CR_V;
+//	set_cr(cr);
+//	cr = get_cr();
+//
+//	if (cr & CR_V) {
 		/*
 		 * If we can use high vectors, create the second level
 		 * page table for the high vectors and zero page
@@ -288,35 +371,35 @@ static void vectors_init(void)
 
 		/* Set the zero page to faulting */
 		zero[0] = 0;
-	} else {
-		/*
-		 * Otherwise map the vectors to the zero page. We have to
-		 * live without being able to catch NULL pointer dereferences
-		 */
-		exc = arm_create_pte(0x0);
-
-		if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-			/*
-			 * ARMv7 CPUs allow to remap low vectors from
-			 * 0x0 to an arbitrary address using VBAR
-			 * register, so let's make sure we have it
-			 * pointing to the correct address
-			 */
-			set_vbar(0x0);
-		}
-	}
-
-	arm_fixup_vectors();
+//	} else {
+//		/*
+//		 * Otherwise map the vectors to the zero page. We have to
+//		 * live without being able to catch NULL pointer dereferences
+//		 */
+//		exc = arm_create_pte(0x0);
+//
+//		if (cpu_architecture() >= CPU_ARCH_ARMv7) {
+//			/*
+//			 * ARMv7 CPUs allow to remap low vectors from
+//			 * 0x0 to an arbitrary address using VBAR
+//			 * register, so let's make sure we have it
+//			 * pointing to the correct address
+//			 */
+//			set_vbar(0x0);
+//		}
+//	}
+//
+//	arm_fixup_vectors();
 
 	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
 	memset(vectors, 0, PAGE_SIZE);
 	memcpy(vectors, __exceptions_start, __exceptions_stop - __exceptions_start);
 
-	if (cr & CR_V)
+//	if (cr & CR_V)
 		exc[256 - 16] = (u32)vectors | PTE_TYPE_SMALL |
 			pte_flags_cached;
-	else
-		exc[0] = (u32)vectors | PTE_TYPE_SMALL | pte_flags_cached;
+//	else
+//		exc[0] = (u32)vectors | PTE_TYPE_SMALL | pte_flags_cached;
 }
 
 /*
@@ -336,56 +419,56 @@ static int mmu_init(void)
 		 */
 		panic("MMU: No memory bank found! Cannot continue\n");
 
-	arm_set_cache_functions();
+//	arm_set_cache_functions();
+//
+//	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
+//		pte_flags_cached = PTE_FLAGS_CACHED_V7;
+//		pte_flags_wc = PTE_FLAGS_WC_V7;
+//		pte_flags_uncached = PTE_FLAGS_UNCACHED_V7;
+//	} else {
+//		pte_flags_cached = PTE_FLAGS_CACHED_V4;
+//		pte_flags_wc = PTE_FLAGS_UNCACHED_V4;
+//		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
+//	}
 
-	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-		pte_flags_cached = PTE_FLAGS_CACHED_V7;
-		pte_flags_wc = PTE_FLAGS_WC_V7;
-		pte_flags_uncached = PTE_FLAGS_UNCACHED_V7;
-	} else {
-		pte_flags_cached = PTE_FLAGS_CACHED_V4;
-		pte_flags_wc = PTE_FLAGS_UNCACHED_V4;
-		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
-	}
-
-	if (get_cr() & CR_M) {
-		/*
-		 * Early MMU code has already enabled the MMU. We assume a
-		 * flat 1:1 section mapping in this case.
-		 */
-		asm volatile ("mrc  p15,0,%0,c2,c0,0" : "=r"(ttb));
-
-		/* Clear unpredictable bits [13:0] */
-		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
-
-		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
-			/*
-			 * This can mean that:
-			 * - the early MMU code has put the ttb into a place
-			 *   which we don't have inside our available memory
-			 * - Somebody else has occupied the ttb region which means
-			 *   the ttb will get corrupted.
-			 */
-			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
-					ttb);
-	} else {
+//	if (get_cr() & CR_M) {
+//		/*
+//		 * Early MMU code has already enabled the MMU. We assume a
+//		 * flat 1:1 section mapping in this case.
+//		 */
+//		asm volatile ("mrc  p15,0,%0,c2,c0,0" : "=r"(ttb));
+//
+//		/* Clear unpredictable bits [13:0] */
+//		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
+//
+//		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
+//			/*
+//			 * This can mean that:
+//			 * - the early MMU code has put the ttb into a place
+//			 *   which we don't have inside our available memory
+//			 * - Somebody else has occupied the ttb region which means
+//			 *   the ttb will get corrupted.
+//			 */
+//			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
+//					ttb);
+//	} else {
 		ttb = memalign(0x10000, 0x4000);
-	}
+//	}
 
 	pr_debug("ttb: 0x%p\n", ttb);
 
-	/* Set the ttb register */
-	asm volatile ("mcr  p15,0,%0,c2,c0,0" : : "r"(ttb) /*:*/);
-
-	/* Set the Domain Access Control Register */
-	i = 0x3;
-	asm volatile ("mcr  p15,0,%0,c3,c0,0" : : "r"(i) /*:*/);
+//	/* Set the ttb register */
+//	asm volatile ("mcr  p15,0,%0,c2,c0,0" : : "r"(ttb) /*:*/);
+//
+//	/* Set the Domain Access Control Register */
+//	i = 0x3;
+//	asm volatile ("mcr  p15,0,%0,c3,c0,0" : : "r"(i) /*:*/);
 
 	/* create a flat mapping using 1MiB sections */
 	create_sections(0, 0, PAGE_SIZE, PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
 			PMD_TYPE_SECT);
 
-	vectors_init();
+//	vectors_init();
 
 	/*
 	 * First remap sdram cached using sections.
@@ -396,14 +479,16 @@ static int mmu_init(void)
 		create_sections(bank->start, bank->start, bank->size >> 20,
 				PMD_SECT_DEF_CACHED);
 
-	__mmu_cache_on();
+//	__mmu_cache_on();
 
 	/*
 	 * Now that we have the MMU and caches on remap sdram again using
 	 * page tables
 	 */
-	for_each_memory_bank(bank)
-		arm_mmu_remap_sdram(bank);
+//	for_each_memory_bank(bank)
+//		arm_mmu_remap_sdram(bank);
+
+	set_ttbr_tcr_mair(1, ttb, TCR_FLAGS, MEMORY_ATTR);
 
 	return 0;
 }
