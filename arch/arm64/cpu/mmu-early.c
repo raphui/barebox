@@ -153,8 +153,6 @@ void mmu_early_enable(uint32_t membase, uint32_t memsize, uint32_t _ttb)
 
 	ttb = (uint64_t *)_ttb;
 
-	printk("%s\n", __func__);
-
 	memset(ttb, 0, GRANULE_SIZE);
 
 	set_ttbr_tcr_mair(1, ttb, TCR_FLAGS, MEMORY_ATTR);

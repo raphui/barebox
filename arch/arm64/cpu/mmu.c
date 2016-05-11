@@ -500,7 +500,7 @@ static int mmu_init(void)
 //		/* Clear unpredictable bits [13:0] */
 //		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
 //
-//		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
+//		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16M))
 //			/*
 //			 * This can mean that:
 //			 * - the early MMU code has put the ttb into a place
@@ -514,15 +514,28 @@ static int mmu_init(void)
 //		ttb = memalign(0x10000, 0x4000);
 //	}
 
-	ttb = get_ttbr(1);
-	pr_debug("ttb: 0x%p\n", ttb);
+	if (get_sctlr() & CR_M) {
+		ttb = get_ttbr(1);
+		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16M))
+			/*
+			* This can mean that:
+			* - the early MMU code has put the ttb into a place
+			*   which we don't have inside our available memory
+			* - Somebody else has occupied the ttb region which means
+			*   the ttb will get corrupted.
+			*/
+			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
+				ttb);
+	} else {
+		ttb = memalign(0x1000, SZ_16M);
+		free_idx = 1;
 
-//	/* Set the ttb register */
-//	asm volatile ("mcr  p15,0,%0,c2,c0,0" : : "r"(ttb) /*:*/);
-//
-//	/* Set the Domain Access Control Register */
-//	i = 0x3;
-//	asm volatile ("mcr  p15,0,%0,c3,c0,0" : : "r"(i) /*:*/);
+		memset(ttb, 0, GRANULE_SIZE);
+
+		set_ttbr_tcr_mair(1, ttb, TCR_FLAGS, MEMORY_ATTR);
+	}
+
+	pr_debug("ttb: 0x%p\n", ttb);
 
 	/* create a flat mapping using 1MiB sections */
 	create_sections(0, 0, PAGE_SIZE, PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
@@ -548,9 +561,9 @@ static int mmu_init(void)
 //	for_each_memory_bank(bank)
 //		arm_mmu_remap_sdram(bank);
 
-//	set_ttbr_tcr_mair(1, ttb, TCR_FLAGS, MEMORY_ATTR);
-	set_sctlr(get_sctlr() | CR_C);
-//	set_sctlr(get_sctlr() | CR_M);
+//	set_sctlr(get_sctlr() | CR_C);
+	if (!(get_sctlr() & CR_M))
+		set_sctlr(get_sctlr() | CR_M);
 
 	return 0;
 }
