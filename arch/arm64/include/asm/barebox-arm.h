@@ -104,8 +104,8 @@ static inline unsigned long arm_mem_ttb(unsigned long membase,
 					unsigned long endmem)
 {
 	endmem = arm_mem_stack(membase, endmem);
-	endmem &= ~(SZ_16K - 1);
-	endmem -= SZ_16K;
+	endmem &= ~(SZ_16M - 1);
+	endmem -= SZ_16M;
 
 	return endmem;
 }

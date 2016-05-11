@@ -107,7 +107,7 @@
 #define TCR_EL2_RSVD		(1 << 31 | 1 << 23)
 #define TCR_EL3_RSVD		(1 << 31 | 1 << 23)
 
-#define TCR_FLAGS             TCR_TG1_4K | \
+#define TCR_FLAGS             TCR_TG0_4K | \
                                 TCR_SHARED_OUTER | \
                                 TCR_SHARED_INNER | \
                                 TCR_IRGN_WBWA | \
@@ -140,7 +140,25 @@ static inline void set_ttbr_tcr_mair(int el, uint64_t table, uint64_t tcr, uint6
 	}
 	asm volatile("isb");
 }
+
+static inline uint64_t get_ttbr(int el)
+{
+	uint64_t val;
+	if (el == 1) {
+		asm volatile("mrs %0, ttbr0_el1" : "=r" (val));
+	} else if (el == 2) {
+		asm volatile("mrs %0, ttbr0_el2" : "=r" (val));
+	} else if (el == 3) {
+		asm volatile("mrs %0, ttbr0_el3" : "=r" (val));
+	} else {
+		hang();
+	}
+
+	return val;
+}
 #endif
+
+#define UNUSED_DESC                0x6EbAAD0BBADbA6E0
 
 #define VA_START                   0x0
 #define BITS_PER_VA                33
@@ -169,6 +187,7 @@ static inline void set_ttbr_tcr_mair(int el, uint64_t table, uint64_t tcr, uint6
 #define IS_ALIGNED(x,a)         (((x) & ((__typeof__(x))(a)-1UL)) == 0)
 
 #define PAGE_MASK	GRANULE_SIZE
+extern int free_idx;
 
 #ifdef CONFIG_MMU
 void __mmu_cache_on(void);

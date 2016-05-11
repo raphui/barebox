@@ -169,6 +169,7 @@ __noreturn void barebox_non_pbl_start(unsigned long membase,
 			arm_set_cache_functions();
 		} else {
 			pr_debug("enabling MMU, ttb @ 0x%08lx\n", ttb);
+			printk("enabling MMU, ttb @ 0x%08lx\n", ttb);
 			arm_early_mmu_cache_invalidate();
 			mmu_early_enable(membase, memsize, ttb);
 		}
