@@ -198,4 +198,6 @@ static inline void __mmu_cache_off(void) {}
 static inline void __mmu_cache_flush(void) {}
 #endif
 
+void mmu_early_enable(uint32_t membase, uint32_t memsize, uint32_t ttb);
+
 #endif /* __ARM_MMU_H */

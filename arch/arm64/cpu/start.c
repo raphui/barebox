@@ -31,7 +31,7 @@
 #include <malloc.h>
 
 #include <debug_ll.h>
-#include "mmu-early.h"
+#include "mmu.h"
 
 unsigned long arm_stack_top;
 static unsigned long arm_head_bottom;
