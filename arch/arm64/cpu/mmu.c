@@ -35,8 +35,6 @@
 static unsigned long *ttb;
 static int free_idx;
 
-#define MAX_ENTRIES	512
-
 static void arm_mmu_not_initialized_error(void)
 {
 	/*
@@ -155,8 +153,9 @@ static void map_region(uint64_t virt, uint64_t phys, uint64_t size, uint64_t att
 				attr |= PMD_TYPE_SECT;
 
 			if (size >= block_size && IS_ALIGNED(addr, block_size)) {
-				*pte = addr | attr;
+				*pte = phys | attr;
 				addr += block_size;
+				phys += block_size;
 				size -= block_size;
 				break;
 
@@ -172,26 +171,7 @@ static void create_sections(unsigned long virt, unsigned long phys, int size_m,
 		unsigned int flags)
 {
 	map_region(virt, phys, size_m, flags);
-//	int i;
-//	unsigned long addr;
-//	uint64_t *pte;
-//	int type;
-//
-//	phys &= PAGE_MASK;
-//	addr = virt & PAGE_MASK;
-//
-//	for (i = size_m; i > 0; i--, addr++, phys++) {
-//		pte = find_pte(addr);
-//		type = pte_type(pte);
-//
-//		if (type == PTE_SECT) {
-//			
-//		} else if (type == PTE_PAGE) {
-//
-//		}
-//	}
-//		ttb[virt] = (phys << 20) | flags;
-//
+
 //	__mmu_cache_flush();
 }
 
@@ -225,65 +205,6 @@ static uint32_t pte_flags_wc;
 static uint32_t pte_flags_uncached;
 
 #define PTE_MASK ((1 << 12) - 1)
-
-
-
-/*
- * Create a second level translation table for the given virtual address.
- * We initially create a flat uncached mapping on it.
- * Not yet exported, but may be later if someone finds use for it.
- */
-//static u32 *arm_create_pte(unsigned long virt)
-//{
-//	u32 *table;
-//	int i;
-//
-//	table = memalign(0x400, 0x400);
-//
-//	if (!ttb)
-//		arm_mmu_not_initialized_error();
-//
-//	ttb[virt >> 20] = (unsigned long)table | PMD_TYPE_TABLE;
-//
-//	for (i = 0; i < 256; i++) {
-//		table[i] = virt | PTE_TYPE_SMALL | pte_flags_uncached;
-//		virt += PAGE_SIZE;
-//	}
-//
-//	return table;
-//}
-
-//static uint64_t *find_pte(unsigned long adr)
-//{
-//	u32 *table;
-//
-//	if (!ttb)
-//		arm_mmu_not_initialized_error();
-//
-//	if ((ttb[adr >> 20] & PMD_TYPE_MASK) != PMD_TYPE_TABLE) {
-//		struct memory_bank *bank;
-//		int i = 0;
-//
-//		/*
-//		 * This should only be called for page mapped memory inside our
-//		 * memory banks. It's a bug to call it with section mapped memory
-//		 * locations.
-//		 */
-//		pr_crit("%s: TTB for address 0x%08lx is not of type table\n",
-//				__func__, adr);
-//		pr_crit("Memory banks:\n");
-//		for_each_memory_bank(bank)
-//			pr_crit("#%d 0x%08lx - 0x%08lx\n", i, bank->start,
-//					bank->start + bank->size - 1);
-//		BUG();
-//	}
-//
-//	/* find the coarse page table base address */
-//	table = (u32 *)(ttb[adr >> 20] & ~0x3ff);
-//
-//	/* find second level descriptor */
-//	return &table[(adr >> PAGE_SHIFT) & 0xff];
-//}
 
 //static void dma_flush_range(unsigned long start, unsigned long end)
 //{
@@ -341,17 +262,12 @@ static uint32_t pte_flags_uncached;
 
 void *map_io_sections(unsigned long phys, void *_start, size_t size)
 {
-//	unsigned long start = (unsigned long)_start, sec;
-//
-//	phys >>= 20;
-//	for (sec = start; sec < start + size; sec += (1 << 20))
-//		ttb[sec >> 20] = (phys++ << 20) | PMD_SECT_DEF_UNCACHED;
-//
+
+	map_region(_start, phys, size, PMD_SECT_DEF_UNCACHED);
+
 //	dma_flush_range((unsigned long)ttb, (unsigned long)ttb + 0x4000);
 //	tlb_invalidate();
 //	return _start;
-
-	map_region(_start, phys, size, PMD_SECT_DEF_UNCACHED);
 }
 
 /*
