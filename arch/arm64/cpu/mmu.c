@@ -429,8 +429,6 @@ void mmu_early_enable(uint32_t membase, uint32_t memsize, uint32_t _ttb)
 	map_cachable(0x00000000, 0x08000000);
 
 	isb();
-	find_pte(0x40000000);
-	find_pte(0x5fa00000);
 	set_sctlr(get_sctlr() | CR_M);
 	isb();
 
