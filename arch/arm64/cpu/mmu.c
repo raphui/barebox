@@ -33,7 +33,7 @@
 #include "mmu.h"
 
 static unsigned long *ttb;
-//static int free_idx;
+static int free_idx;
 
 #define MAX_ENTRIES	512
 
@@ -156,7 +156,6 @@ static void map_region(uint64_t virt, uint64_t phys, uint64_t size, uint64_t att
 
 			if (size >= block_size && IS_ALIGNED(addr, block_size)) {
 				*pte = addr | attr;
-				printk("virt at %llx pte at %llx [%llx] at level %d with idx %d remaining size %llx\n", addr, pte, *pte, level, idx, size);
 				addr += block_size;
 				size -= block_size;
 				break;
@@ -194,6 +193,12 @@ static void create_sections(unsigned long virt, unsigned long phys, int size_m,
 //		ttb[virt] = (phys << 20) | flags;
 //
 //	__mmu_cache_flush();
+}
+
+static void map_cachable(unsigned long start, unsigned long size)
+{
+	create_sections(start, start, size, PMD_SECT_AP_WRITE |
+			PMD_SECT_AP_READ | PMD_TYPE_SECT | PMD_SECT_WB);
 }
 
 /*
@@ -406,61 +411,6 @@ static int arm_mmu_remap_sdram(struct memory_bank *bank)
 #define ARM_VECTORS_SIZE	(sizeof(u32) * 8 * 2)
 
 /*
- * Map vectors and zero page
- */
-static void vectors_init(void)
-{
-	u32 *exc, *zero = NULL;
-	void *vectors;
-	u32 cr;
-
-//	cr = get_cr();
-//	cr |= CR_V;
-//	set_cr(cr);
-//	cr = get_cr();
-//
-//	if (cr & CR_V) {
-		/*
-		 * If we can use high vectors, create the second level
-		 * page table for the high vectors and zero page
-		 */
-//		exc = arm_create_pte(0xfff00000);
-//		zero = arm_create_pte(0x0);
-
-		/* Set the zero page to faulting */
-//		zero[0] = 0;
-//	} else {
-//		/*
-//		 * Otherwise map the vectors to the zero page. We have to
-//		 * live without being able to catch NULL pointer dereferences
-//		 */
-//		exc = arm_create_pte(0x0);
-//
-//		if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-//			/*
-//			 * ARMv7 CPUs allow to remap low vectors from
-//			 * 0x0 to an arbitrary address using VBAR
-//			 * register, so let's make sure we have it
-//			 * pointing to the correct address
-//			 */
-//			set_vbar(0x0);
-//		}
-//	}
-//
-//	arm_fixup_vectors();
-
-//	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
-//	memset(vectors, 0, PAGE_SIZE);
-//	memcpy(vectors, __exceptions_start, __exceptions_stop - __exceptions_start);
-
-//	if (cr & CR_V)
-//		exc[256 - 16] = (u32)vectors | PTE_TYPE_SMALL |
-//			pte_flags_cached;
-//	else
-//		exc[0] = (u32)vectors | PTE_TYPE_SMALL | pte_flags_cached;
-}
-
-/*
  * Prepare MMU for usage enable it.
  */
 static int mmu_init(void)
@@ -490,30 +440,6 @@ static int mmu_init(void)
 //		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
 //	}
 
-//	if (get_cr() & CR_M) {
-//		/*
-//		 * Early MMU code has already enabled the MMU. We assume a
-//		 * flat 1:1 section mapping in this case.
-//		 */
-//		asm volatile ("mrc  p15,0,%0,c2,c0,0" : "=r"(ttb));
-//
-//		/* Clear unpredictable bits [13:0] */
-//		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
-//
-//		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16M))
-//			/*
-//			 * This can mean that:
-//			 * - the early MMU code has put the ttb into a place
-//			 *   which we don't have inside our available memory
-//			 * - Somebody else has occupied the ttb region which means
-//			 *   the ttb will get corrupted.
-//			 */
-//			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
-//					ttb);
-//	} else {
-//		ttb = memalign(0x10000, 0x4000);
-//	}
-
 	if (get_sctlr() & CR_M) {
 		ttb = get_ttbr(1);
 		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16M))
@@ -541,8 +467,6 @@ static int mmu_init(void)
 	create_sections(0, 0, PAGE_SIZE, PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
 			PMD_TYPE_SECT);
 
-//	vectors_init();
-
 	/*
 	 * First remap sdram cached using sections.
 	 * This is to speed up the generation of 2nd level page tables
@@ -568,6 +492,34 @@ static int mmu_init(void)
 	return 0;
 }
 mmu_initcall(mmu_init);
+
+void mmu_early_enable(uint32_t membase, uint32_t memsize, uint32_t _ttb)
+{
+	int i;
+	uint64_t *pt;
+
+	ttb = (uint64_t *)_ttb;
+
+	memset(ttb, 0, GRANULE_SIZE);
+	free_idx = 1;
+
+	set_ttbr_tcr_mair(1, ttb, TCR_FLAGS, MEMORY_ATTR);
+
+	create_sections(0, 0, 4096, PMD_SECT_AP_WRITE |
+			PMD_SECT_AP_READ | PMD_TYPE_SECT);
+
+	map_cachable(membase, memsize);
+	map_cachable(0x09000000, 0x01000000);
+	map_cachable(0x00000000, 0x08000000);
+
+	isb();
+	find_pte(0x40000000);
+	find_pte(0x5fa00000);
+	set_sctlr(get_sctlr() | CR_M);
+	isb();
+
+//	__mmu_cache_on();
+}
 
 void *dma_alloc_coherent(size_t size, dma_addr_t *dma_handle)
 {

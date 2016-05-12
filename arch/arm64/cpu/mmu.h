@@ -187,7 +187,6 @@ static inline uint64_t get_ttbr(int el)
 #define IS_ALIGNED(x,a)         (((x) & ((__typeof__(x))(a)-1UL)) == 0)
 
 #define PAGE_MASK	GRANULE_SIZE
-extern int free_idx;
 
 #ifdef CONFIG_MMU
 void __mmu_cache_on(void);
