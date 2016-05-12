@@ -26,7 +26,6 @@
 void __noreturn barebox_arm_entry(unsigned long membase,
 					  unsigned long memsize, void *boarddata)
 {
-	arm_setup_stack(membase + memsize - 16);
 	arm_early_mmu_cache_invalidate();
 
 	if (IS_ENABLED(CONFIG_PBL_MULTI_IMAGES))

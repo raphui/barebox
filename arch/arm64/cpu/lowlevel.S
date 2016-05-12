@@ -38,12 +38,6 @@ ENTRY(arm_cpu_lowlevel_init)
 	b	done
 
 done:
-	ldr	x1, =STACK_BASE
-	mov	sp, x1
-	mov     x29, #0
-	stp     x29, x29, [sp, #-16]!
-	mov     x29, sp
-
 	ret
 
 ENDPROC(arm_cpu_lowlevel_init)

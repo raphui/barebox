@@ -13,6 +13,7 @@
 void barebox_arm_reset_vector(void)
 {
 	arm_cpu_lowlevel_init();
+	arm_setup_stack(STACK_BASE);
 
 	barebox_arm_entry(0x40000000, SZ_512M, NULL);
 }
