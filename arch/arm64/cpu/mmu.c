@@ -190,7 +190,18 @@ static void map_cachable(unsigned long start, unsigned long size)
  */
 static inline void tlb_invalidate(void)
 {
-	v8_invalidate_icache_all();
+	unsigned int el = current_el();
+
+	dsb();
+	if (el == 1)
+		__asm__ __volatile__("tlbi alle1\n\t" : : : "memory");
+	else if (el == 2)
+		__asm__ __volatile__("tlbi alle2\n\t" : : : "memory");
+	else if (el == 3)
+		__asm__ __volatile__("tlbi alle3\n\t" : : : "memory");
+
+	dsb();
+	isb();
 }
 
 #define PTE_FLAGS_CACHED_V7 (PTE_EXT_TEX(1) | PTE_BUFFERABLE | PTE_CACHEABLE)
@@ -384,11 +395,6 @@ static int mmu_init(void)
 		create_sections(bank->start, bank->start, bank->size,
 				PMD_SECT_DEF_CACHED);
 	}
-	
-//	dsb();
-//	__asm__ __volatile__("tlbi alle1is\n\t" : : : "memory");
-//	dsb();
-//	isb();
 
 //	__mmu_cache_on();
 
