@@ -170,6 +170,9 @@ static void map_region(uint64_t virt, uint64_t phys, uint64_t size, uint64_t att
 static void create_sections(unsigned long virt, unsigned long phys, int size_m,
 		unsigned int flags)
 {
+	if (!ttb)
+		arm_mmu_not_initialized_error();
+
 	map_region(virt, phys, size_m, flags);
 
 //	__mmu_cache_flush();
@@ -344,21 +347,9 @@ static int mmu_init(void)
 		 */
 		panic("MMU: No memory bank found! Cannot continue\n");
 
-//	arm_set_cache_functions();
-//
-//	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-//		pte_flags_cached = PTE_FLAGS_CACHED_V7;
-//		pte_flags_wc = PTE_FLAGS_WC_V7;
-//		pte_flags_uncached = PTE_FLAGS_UNCACHED_V7;
-//	} else {
-//		pte_flags_cached = PTE_FLAGS_CACHED_V4;
-//		pte_flags_wc = PTE_FLAGS_UNCACHED_V4;
-//		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
-//	}
-
 	if (get_sctlr() & CR_M) {
 		ttb = get_ttbr(1);
-		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16M))
+		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
 			/*
 			* This can mean that:
 			* - the early MMU code has put the ttb into a place
@@ -369,7 +360,7 @@ static int mmu_init(void)
 			pr_crit("Critical Error: Can't request SDRAM region for ttb at %p\n",
 				ttb);
 	} else {
-		ttb = memalign(0x1000, SZ_16M);
+		ttb = memalign(0x1000, SZ_16K);
 		free_idx = 1;
 
 		memset(ttb, 0, GRANULE_SIZE);
@@ -388,9 +379,16 @@ static int mmu_init(void)
 	 * This is to speed up the generation of 2nd level page tables
 	 * below
 	 */
-	for_each_memory_bank(bank)
+	for_each_memory_bank(bank) {
+		printk("bankbase %x, banksize: %x, bankend: %x\n", bank->start, bank->size, bank->start + bank->size);
 		create_sections(bank->start, bank->start, bank->size,
 				PMD_SECT_DEF_CACHED);
+	}
+	
+//	dsb();
+//	__asm__ __volatile__("tlbi alle1is\n\t" : : : "memory");
+//	dsb();
+//	isb();
 
 //	__mmu_cache_on();
 
@@ -401,9 +399,8 @@ static int mmu_init(void)
 //	for_each_memory_bank(bank)
 //		arm_mmu_remap_sdram(bank);
 
-//	set_sctlr(get_sctlr() | CR_C);
 	if (!(get_sctlr() & CR_M))
-		set_sctlr(get_sctlr() | CR_M);
+		set_sctlr(get_sctlr() | CR_M | CR_C | CR_I);
 
 	return 0;
 }
@@ -427,6 +424,8 @@ void mmu_early_enable(uint32_t membase, uint32_t memsize, uint32_t _ttb)
 	map_cachable(membase, memsize);
 	map_cachable(0x09000000, 0x01000000);
 	map_cachable(0x00000000, 0x08000000);
+
+	printk("membase %x, memsize: %x, memend: %x\n", membase, memsize, membase + memsize);
 
 	isb();
 	set_sctlr(get_sctlr() | CR_M);
