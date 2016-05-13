@@ -193,6 +193,7 @@ static inline void tlb_invalidate(void)
 	unsigned int el = current_el();
 
 	dsb();
+
 	if (el == 1)
 		__asm__ __volatile__("tlbi alle1\n\t" : : : "memory");
 	else if (el == 2)
