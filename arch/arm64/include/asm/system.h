@@ -2,7 +2,7 @@
 #define __ASM_ARM_SYSTEM_H
 
 #define isb() __asm__ __volatile__ ("isb" : : : "memory")
-#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
+#define dsb() __asm__ __volatile__ ("dsb sy" : : : "memory")
 #define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
 
 /*
