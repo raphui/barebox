@@ -12,7 +12,7 @@
 
 void virt_add_ddram(u32 size)
 {
-	arm_add_mem_device("ram0", 0x50000000, size);
+	arm_add_mem_device("ram0", 0x40000000, size);
 }
 
 void virt_register_uart(unsigned id)

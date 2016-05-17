@@ -16,7 +16,7 @@
 
 static int virt_mem_init(void)
 {
-	virt_add_ddram(SZ_256M);
+	virt_add_ddram(SZ_512M);
 
 	add_cfi_flash_device(0, 0x00000000, SZ_4M, 0);
 
