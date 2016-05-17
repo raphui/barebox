@@ -397,6 +397,9 @@ static int mmu_init(void)
 				PMD_SECT_DEF_CACHED);
 	}
 
+	map_cachable(0x09000000, 0x01000000);
+	map_cachable(0x00000000, 0x08000000);
+
 //	__mmu_cache_on();
 
 	/*
