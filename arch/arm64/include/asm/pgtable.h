@@ -18,8 +18,9 @@
  */
 #define PMD_TYPE_MASK		(3 << 0)
 #define PMD_TYPE_FAULT		(0 << 0)
-#define PMD_TYPE_TABLE		(1 << 0)
-#define PMD_TYPE_SECT		(2 << 0)
+#define PMD_TYPE_TABLE		(3 << 0)
+#define PMD_TYPE_PAGE		(3 << 0)
+#define PMD_TYPE_SECT		(1 << 0)
 #define PMD_BIT4		(1 << 4)
 #define PMD_DOMAIN(x)		((x) << 5)
 #define PMD_PROTECTION		(1 << 9)	/* v5 */

@@ -31,7 +31,7 @@
 #include <malloc.h>
 
 #include <debug_ll.h>
-#include "mmu-early.h"
+#include "mmu.h"
 
 unsigned long arm_stack_top;
 static unsigned long arm_head_bottom;
@@ -170,7 +170,7 @@ __noreturn void barebox_non_pbl_start(unsigned long membase,
 		} else {
 			pr_debug("enabling MMU, ttb @ 0x%08lx\n", ttb);
 			arm_early_mmu_cache_invalidate();
-			mmu_early_enable(membase, memsize, ttb);
+			mmu_early_enable((uint64_t)membase, (uint64_t)memsize, (uint64_t)ttb);
 		}
 	}
 

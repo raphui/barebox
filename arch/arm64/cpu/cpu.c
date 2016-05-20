@@ -61,25 +61,6 @@ int icache_status(void)
 	return (get_sctlr() & CR_I) != 0;
 }
 
-/*
- * SoC like the ux500 have the l2x0 always enable
- * with or without MMU enable
- */
-struct outer_cache_fns outer_cache;
-
-/*
- * Clean and invalide caches, disable MMU
- */
-void mmu_disable(void)
-{
-	__mmu_cache_flush();
-	if (outer_cache.disable) {
-		outer_cache.flush_all();
-		outer_cache.disable();
-	}
-	__mmu_cache_off();
-}
-
 /**
  * Disable MMU and D-cache, flush caches
  * @return 0 (always)

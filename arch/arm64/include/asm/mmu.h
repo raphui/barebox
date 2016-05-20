@@ -13,9 +13,7 @@
 
 struct arm_memory;
 
-static inline void mmu_enable(void)
-{
-}
+void mmu_enable(void);
 void mmu_disable(void);
 static inline void arm_create_section(unsigned long virt, unsigned long phys, int size_m,
 		unsigned int flags)
@@ -30,7 +28,7 @@ static inline void setup_dma_coherent(unsigned long offset)
 #define ARCH_HAS_REMAP
 #define MAP_ARCH_DEFAULT MAP_CACHED
 int arch_remap_range(void *_start, size_t size, unsigned flags);
-void *map_io_sections(unsigned long physaddr, void *start, size_t size);
+void *map_io_sections(uint64_t phys, void *_start, size_t size);
 #else
 #define MAP_ARCH_DEFAULT MAP_UNCACHED
 static inline void *map_io_sections(unsigned long phys, void *start, size_t size)

@@ -8,7 +8,7 @@ obj-y += start.o entry.o
 #
 obj-$(CONFIG_CMD_ARM_CPUINFO) += cpuinfo.o
 obj-$(CONFIG_CMD_ARM_MMUINFO) += mmuinfo.o
-obj-$(CONFIG_MMU) += cache.o
+obj-$(CONFIG_MMU) += mmu.o cache.o
 
 AFLAGS_cache-armv8.o       :=-Wa,-march=armv8-a
 obj-$(CONFIG_CPU_64v8) += cache-armv8.o

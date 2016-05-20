@@ -11,8 +11,8 @@ extern void *_barebox_image_size;
 extern void *_barebox_bare_init_size;
 extern void *_barebox_pbl_size;
 
-#define barebox_image_size	(unsigned int)&_barebox_image_size
-#define barebox_bare_init_size	(unsigned int)&_barebox_bare_init_size
-#define barebox_pbl_size	(unsigned int)&_barebox_pbl_size
+#define barebox_image_size	((uint64_t)&_barebox_image_size)
+#define barebox_bare_init_size	((uint64_t)&_barebox_bare_init_size)
+#define barebox_pbl_size	((uint64_t)&_barebox_pbl_size)
 
 #endif /* _ASM_GENERIC_SECTIONS_H_ */
