@@ -13,6 +13,7 @@
 #include <linux/sizes.h>
 #include <io.h>
 #include <globalvar.h>
+#include <asm/mmu.h>
 
 static int virt_mem_init(void)
 {
@@ -50,3 +51,17 @@ static int virt_core_init(void)
 	return 0;
 }
 postcore_initcall(virt_core_init);
+
+static int virt_mmu_enable(void)
+{
+	/* Mapping all periph range */
+	arch_remap_range(0x09000000, 0x01000000, PMD_SECT_DEF_CACHED);
+
+	/* Mapping all flash range */
+	arch_remap_range(0x00000000, 0x08000000, PMD_SECT_DEF_CACHED);
+
+	mmu_enable();
+
+	return 0;
+}
+postmmu_initcall(virt_mmu_enable);
