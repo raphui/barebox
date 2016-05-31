@@ -151,7 +151,9 @@ __noreturn void barebox_non_pbl_start(unsigned long membase,
 		relocate_to_adr(barebox_base);
 	}
 
+#if __LINUX_ARM_ARCH__ <= 7
 	setup_c();
+#endif
 
 	barrier();
 
