@@ -255,6 +255,14 @@ config ARCH_ZYNQ
 	bool "Xilinx Zynq-based boards"
 	select HAS_DEBUG_LL
 
+config ARCH_VIRT
+	bool "ARM QEMU virt boards"
+	select HAS_DEBUG_LL
+	select CPU_V8
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select ARM_AMBA
+	select HAVE_CONFIGURABLE_MEMORY_LAYOUT
+
 endchoice
 
 source arch/arm/cpu/Kconfig
@@ -280,6 +288,7 @@ source arch/arm/mach-vexpress/Kconfig
 source arch/arm/mach-tegra/Kconfig
 source arch/arm/mach-uemd/Kconfig
 source arch/arm/mach-zynq/Kconfig
+source arch/arm/mach-virt/Kconfig
 
 config ARM_ASM_UNIFIED
 	bool
