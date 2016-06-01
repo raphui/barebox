@@ -13,9 +13,7 @@
 
 struct arm_memory;
 
-static inline void mmu_enable(void)
-{
-}
+void mmu_enable(void);
 void mmu_disable(void);
 static inline void arm_create_section(unsigned long virt, unsigned long phys, int size_m,
 		unsigned int flags)

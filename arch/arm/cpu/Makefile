@@ -2,8 +2,11 @@ obj-y += cpu.o
 
 ifeq ($(CONFIG_CPU_64v8), y)
 obj-$(CONFIG_ARM_EXCEPTIONS) += exceptions_64.o
+obj-$(CONFIG_MMU) += mmu_64.o
 else
 obj-$(CONFIG_ARM_EXCEPTIONS) += exceptions.o
+obj-$(CONFIG_MMU) += mmu.o mmu-early.o
+pbl-$(CONFIG_MMU) += mmu-early.o
 endif
 
 obj-$(CONFIG_ARM_EXCEPTIONS) += interrupts.o
@@ -19,8 +22,8 @@ endif
 obj-$(CONFIG_CMD_ARM_CPUINFO) += cpuinfo.o
 obj-$(CONFIG_CMD_ARM_MMUINFO) += mmuinfo.o
 obj-$(CONFIG_OFDEVICE) += dtb.o
-obj-$(CONFIG_MMU) += mmu.o cache.o mmu-early.o
-pbl-$(CONFIG_MMU) += mmu-early.o
+obj-$(CONFIG_MMU) += cache.o
+
 ifeq ($(CONFIG_MMU),)
 obj-y += no-mmu.o
 endif
