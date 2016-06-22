@@ -96,20 +96,9 @@ void armlinux_set_bootparams(void *params)
 void start_linux(void *adr, int swap, unsigned long initrd_address,
 		unsigned long initrd_size, void *oftree)
 {
-	void (*kernel)(int zero, int arch, void *params) = adr;
-	void *params = NULL;
-	int architecture;
-
-	if (oftree) {
-		pr_debug("booting kernel with devicetree\n");
-		params = oftree;
-	} else {
-		setup_tags(initrd_address, initrd_size, swap);
-		params = armlinux_get_bootparams();
-	}
-	architecture = armlinux_get_architecture();
+	void (*kernel)(void *dtb) = adr;
 
 	shutdown_barebox();
 
-	kernel(0, architecture, params);
+	kernel(oftree);
 }
