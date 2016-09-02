@@ -10,6 +10,7 @@
 enum filetype {
 	filetype_unknown,
 	filetype_arm_zimage,
+	filetype_arm_image,
 	filetype_lzo_compressed,
 	filetype_lz4_compressed,
 	filetype_arm_barebox,

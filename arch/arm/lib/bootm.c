@@ -552,6 +552,168 @@ static struct image_handler aimage_handler = {
 	.filetype = filetype_aimage,
 };
 
+#ifdef CONFIG_CPU_64v8
+struct arm_image_header {
+	uint32_t	code0;		/* Executable code */
+	uint32_t	code1;		/* Executable code */
+	uint64_t	text_offset;	/* Image load offset */
+	uint64_t	res0;		/* reserved */
+	uint64_t	res1;		/* reserved */
+	uint64_t	res2;		/* reserved */
+	uint64_t	res3;		/* reserved */
+	uint64_t	res4;		/* reserved */
+	uint32_t	magic;		/* Magic number */
+	uint32_t	res5;
+};
+
+#define LINUX_ARM64_IMAGE_MAGIC	0x644d5241
+/* XXX: Hack 16MB image size for now */
+#define HACK_ARM64_IMAGE_SIZE	(16 << 20)
+
+static int do_booti_linux_fdt(int fd, struct image_data *data)
+{
+	struct fdt_header __header, *header;
+	void *oftree;
+	int ret;
+
+	u32 end;
+
+	if (data->oftree)
+		return -ENXIO;
+
+	header = &__header;
+	ret = read(fd, header, sizeof(*header));
+	if (ret < sizeof(*header))
+		return ret;
+
+	if (file_detect_type(header, sizeof(*header)) != filetype_oftree)
+		return -ENXIO;
+
+	end = be32_to_cpu(header->totalsize);
+
+	oftree = malloc(end + 0x8000);
+	if (!oftree) {
+		perror("Image: oftree malloc");
+		return -ENOMEM;
+	}
+
+	memcpy(oftree, header, sizeof(*header));
+
+	end -= sizeof(*header);
+
+	ret = read_full(fd, oftree + sizeof(*header), end);
+	if (ret < 0)
+		goto err_free;
+	if (ret < end) {
+		printf("premature end of image\n");
+		ret = -EIO;
+		goto err_free;
+	}
+
+	if (IS_BUILTIN(CONFIG_OFTREE)) {
+		data->of_root_node = of_unflatten_dtb(oftree);
+		if (!data->of_root_node) {
+			pr_err("unable to unflatten devicetree\n");
+			ret = -EINVAL;
+			goto err_free;
+		}
+		free(oftree);
+	} else {
+		data->oftree = oftree;
+	}
+
+	pr_info("zImage: concatenated oftree detected\n");
+
+	return 0;
+
+err_free:
+	free(oftree);
+
+	return ret;
+}
+
+static int do_booti_image(struct image_data *data)
+{
+	int fd, ret = 0, swap = 0;
+	struct arm_image_header __header, *header;
+	void *image;
+	size_t image_size;
+	unsigned long load_address = data->os_address;
+	unsigned long mem_free;
+
+	fd = open(data->os_file, O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		return 1;
+	}
+
+	header = &__header;
+	ret = read(fd, header, sizeof(*header));
+	if (ret < sizeof(*header)) {
+		printf("could not read %s\n", data->os_file);
+		goto err_out;
+	}
+
+	switch (header->magic) {
+	case LINUX_ARM64_IMAGE_MAGIC:
+		break;
+	default:
+		printf("invalid magic 0x%08x\n", header->magic);
+		ret = -EINVAL;
+		goto err_out;
+	}
+
+	image_size = HACK_ARM64_IMAGE_SIZE;
+	load_address = data->os_address;
+
+	ret = get_kernel_addresses(image_size, bootm_verbose(data),
+			     &load_address, &mem_free);
+	if (ret)
+		return ret;
+
+	data->os_res = request_sdram_region("image", load_address, image_size);
+	if (!data->os_res) {
+		pr_err("bootm/Image: failed to request memory at 0x%lx to 0x%lx (%d).\n",
+		       load_address, load_address + image_size, image_size);
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	image = (void *)data->os_res->start;
+
+	memcpy(image, header, sizeof(*header));
+
+	ret = read_full(fd, image + sizeof(*header),
+			image_size - sizeof(*header));
+	if (ret < 0)
+		goto err_out;
+	if (ret < image_size - sizeof(*header)) {
+		printf("premature end of image\n");
+		ret = -EIO;
+		goto err_out;
+	}
+
+	ret = do_bootz_linux_fdt(fd, data);
+	if (ret && ret != -ENXIO)
+		goto err_out;
+
+	close(fd);
+
+	return __do_bootm_linux(data, mem_free, swap);
+
+err_out:
+	close(fd);
+
+	return 0;
+}
+
+static struct image_handler image_handler = {
+	.name = "ARM Image",
+	.bootm = do_booti_image,
+	.filetype = filetype_arm_image,
+};
+#endif
+
 #ifdef CONFIG_BOOTM_AIMAGE
 BAREBOX_MAGICVAR(aimage_noverwrite_bootargs, "Disable overwrite of the bootargs with the one present in aimage");
 BAREBOX_MAGICVAR(aimage_noverwrite_tags, "Disable overwrite of the tags addr with the one present in aimage");
@@ -578,6 +740,14 @@ static struct binfmt_hook binfmt_barebox_hook = {
 	.exec = "bootm",
 };
 
+#ifdef CONFIG_CPU_64v8
+static struct binfmt_hook binfmt_arm_image_hook = {
+	.type = filetype_arm_image,
+	.exec = "booti",
+};
+
+#endif
+
 static int armlinux_register_image_handler(void)
 {
 	register_image_handler(&barebox_handler);
@@ -592,6 +762,11 @@ static int armlinux_register_image_handler(void)
 	        register_image_handler(&arm_fit_handler);
 	binfmt_register(&binfmt_arm_zimage_hook);
 	binfmt_register(&binfmt_barebox_hook);
+
+#ifdef CONFIG_CPU_64v8
+
+	binfmt_register(&binfmt_arm_image_hook);
+#endif
 
 	return 0;
 }
