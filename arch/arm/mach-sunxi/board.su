@@ -1,0 +1,2 @@
+board.c:148:6:s_init	16	static
+board.c:269:6:reset_cpu	0	static

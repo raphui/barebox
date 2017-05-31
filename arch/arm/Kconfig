@@ -257,6 +257,10 @@ config ARCH_QEMU
 	bool "ARM QEMU boards"
 	select HAS_DEBUG_LL
 
+config ARCH_SUNXI
+	bool "ARM SUNXI boards"
+	select HAS_DEBUG_LL
+
 endchoice
 
 source arch/arm/cpu/Kconfig
@@ -283,6 +287,7 @@ source arch/arm/mach-tegra/Kconfig
 source arch/arm/mach-uemd/Kconfig
 source arch/arm/mach-zynq/Kconfig
 source arch/arm/mach-qemu/Kconfig
+source arch/arm/mach-sunxi/Kconfig
 
 config ARM_ASM_UNIFIED
 	bool
